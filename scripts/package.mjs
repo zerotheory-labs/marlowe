@@ -23,6 +23,7 @@ const paths = await packager({
     /^\/test/,
     /^\/scripts/,
     /^\/src/,
+    /^\/docs/,
     /^\/MacOS/,
     /^\/WindowsOS/,
     /^\/LinuxOS/,

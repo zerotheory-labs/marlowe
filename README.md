@@ -1,131 +1,234 @@
-# Marlowe.
+<div align="center">
 
-**Security for AI. A little more careful.**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/marlowe-banner-dark.svg" />
+  <source media="(prefers-color-scheme: light)" srcset="./docs/assets/marlowe-banner-light.svg" />
+  <img alt="Marlowe. — Security for AI. A little more careful. By Zero Theory Labs." src="./docs/assets/marlowe-banner-dark.svg" width="100%" />
+</picture>
 
-Marlowe (`v0.4.0`, by **[Zero Theory Labs](https://github.com/zero-theory-labs)**) is a native desktop terminal and cybersecurity workbench: real interactive shells (`node-pty` + `xterm.js`) alongside a streaming security partner, **Codebase DNA**, **9-CLI Security Convergence**, **Attack Reachability** graphs, host-enforced **Approve once** gates, `ScopeGate` SSRF confinement, secret masking, and SARIF v2.1.0 / Markdown finding reports.
+<br />
 
-> **License:** Source-available under the **[PolyForm Noncommercial License 1.0.0](./LICENSE)**. Personal, academic, educational, non-profit, and non-commercial security research uses are free. Commercial use requires a separate license from Zero Theory Labs.
+[![Release v0.4.0](https://img.shields.io/badge/release-v0.4.0-3ddc97?style=flat-square&labelColor=181714)](https://github.com/zero-theory-labs/marlowe/releases/tag/v0.4.0)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-e5c07b?style=flat-square&labelColor=181714)](./LICENSE)
+[![macOS Validated](https://img.shields.io/badge/macOS-validated_(arm64_%7C_x64)-3ddc97?style=flat-square&labelColor=181714)](./MacOS)
+[![Windows & Linux](https://img.shields.io/badge/Windows_%26_Linux-experimental-6ea8fe?style=flat-square&labelColor=181714)](./WindowsOS)
+[![Local Security CLIs](https://img.shields.io/badge/security_CLIs-9_local_engines-3ddc97?style=flat-square&labelColor=181714)](#9-cli-security-toolchain)
+[![Renderer CSP](https://img.shields.io/badge/renderer_CSP-connect--src_'none'-3ddc97?style=flat-square&labelColor=181714)](./SECURITY.md)
+[![Tests Passing](https://img.shields.io/badge/tests-55_unit_%C2%B7_3_E2E_passing-3ddc97?style=flat-square&labelColor=181714)](#validation--tests)
+
+<p>
+  <a href="./MacOS"><b>MacOS/</b></a> &nbsp;·&nbsp;
+  <a href="./WindowsOS"><b>WindowsOS/</b></a> &nbsp;·&nbsp;
+  <a href="./LinuxOS"><b>LinuxOS/</b></a> &nbsp;·&nbsp;
+  <a href="#three-live-security-visualizations"><b>3 Security Maps</b></a> &nbsp;·&nbsp;
+  <a href="#connect-a-model-local-air-gapped-or-cloud"><b>14 Model Providers</b></a> &nbsp;·&nbsp;
+  <a href="#architecture--trust-boundaries"><b>Architecture</b></a> &nbsp;·&nbsp;
+  <a href="./SECURITY.md"><b>Security Policy</b></a> &nbsp;·&nbsp;
+  <a href="./LICENSE"><b>License</b></a>
+</p>
+
+</div>
+
+---
+
+**Marlowe.** (`v0.4.0`, by **[Zero Theory Labs](https://github.com/zero-theory-labs)**) is a source-available desktop terminal and cybersecurity workbench. It pairs real interactive shells (`node-pty` + `xterm.js`) with a taint-verifying security agent, **Codebase DNA** entropy mapping, **9-CLI Security Convergence** & **Attack Reachability** graphs, host-enforced **Approve once** gates, `ScopeGate` SSRF confinement, and **SARIF v2.1.0** finding ledgers.
+
+<p align="center">
+  <img src="./docs/assets/hero-convergence.png" alt="Marlowe — 9-CLI Security Convergence alongside Codebase DNA" width="100%" />
+</p>
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="./docs/assets/view-reachability.png" alt="Attack Surface Reachability Graph" width="100%" />
+      <p align="center"><sub><b>Attack Reachability</b> — Entry surfaces → handlers → sinks → blast radius</sub></p>
+    </td>
+    <td width="50%">
+      <img src="./docs/assets/view-models.png" alt="Connect Your Model — Local Loopback Radar + 10 Cloud Providers" width="100%" />
+      <p align="center"><sub><b>Model Command Center</b> — Local Ollama/LM Studio/Jan/vLLM radar + 10 cloud presets</sub></p>
+    </td>
+  </tr>
+</table>
+
+> [!IMPORTANT]
+> **Source-Available, Non-Commercial License:** Marlowe is licensed under the **[PolyForm Noncommercial License 1.0.0](./LICENSE)**. Personal, academic, educational, non-profit, and non-commercial security research uses are free. Commercial or workplace use requires a commercial license from **Zero Theory Labs**.
 
 ---
 
 ## Operating System Folders
 
-Choose your platform folder for OS-specific prerequisites, 9-CLI security toolchain installers, and desktop bundle scripts:
+All platforms build from the **single shared codebase** at this repository root (`electron/` + `src/`). Pick your OS folder for native toolchain prerequisites, 9-CLI security installers, and desktop packaging scripts:
 
-| Folder | Platform | Validation Status | Quick Links |
-| --- | --- | --- | --- |
-| **[`MacOS/`](./MacOS)** | macOS 14+ (`arm64` & `x64`) | **Exercised & Validated** | [Setup Guide](./MacOS/README.md) · [`Brewfile` (9 CLIs)](./MacOS/Brewfile) · [`build-macos.sh`](./MacOS/build-macos.sh) |
-| **[`WindowsOS/`](./WindowsOS)** | Windows 11 (`x64` & `arm64`) | **Experimental** *(not yet host-validated)* | [Setup Guide](./WindowsOS/README.md) · [`install-clis.ps1`](./WindowsOS/install-clis.ps1) · [`build-windows.ps1`](./WindowsOS/build-windows.ps1) |
-| **[`LinuxOS/`](./LinuxOS)** | Linux (`x64` & `arm64`) | **Experimental** *(not yet host-validated)* | [Setup Guide](./LinuxOS/README.md) · [`install-clis.sh`](./LinuxOS/install-clis.sh) · [`build-linux.sh`](./LinuxOS/build-linux.sh) |
-
-All three platforms build from the **single shared codebase** at this repository root (`electron/` and `src/`).
+| OS Folder | Target Platforms | Validation Status | 1-Command Toolchain / Build |
+| :--- | :--- | :--- | :--- |
+| **[`MacOS/`](./MacOS)** | macOS 14+ (`arm64` & `x64`) | `VALIDATED` | `brew bundle --file=MacOS/Brewfile && ./MacOS/build-macos.sh` |
+| **[`WindowsOS/`](./WindowsOS)** | Windows 11 (`x64` & `arm64`) | `EXPERIMENTAL` | `.\WindowsOS\build-windows.ps1` *(see [`WindowsOS/README.md`](./WindowsOS/README.md))* |
+| **[`LinuxOS/`](./LinuxOS)** | Ubuntu / Debian / Fedora / Arch | `EXPERIMENTAL` | `./LinuxOS/build-linux.sh` *(see [`LinuxOS/README.md`](./LinuxOS/README.md))* |
 
 ---
 
-## Quickstart (From Source)
+## Quickstart
 
-Requires **Node.js `22.12+`** and `npm` (plus C++ build tools for `node-pty` — Xcode CLT on macOS, `build-essential` + `libsecret-1-dev` on Linux, or Visual Studio Build Tools on Windows).
+Requires **Node.js `22.12+`** and `npm` (plus C++ build tools to compile `node-pty` against Electron's ABI):
 
 ```sh
+# 1. Clone the repository
+git clone https://github.com/zero-theory-labs/marlowe.git
+cd marlowe
+
+# 2. (macOS optional) Install all 9 local security CLIs + Ollama
+brew bundle --file=MacOS/Brewfile
+
+# 3. Install dependencies, build the renderer, and launch Marlowe
 npm install
 npm start
 ```
 
-- `npm run dev` builds an unminified renderer and launches Electron (restart after source changes; no hot reload).
-- `npm run package` (or `./MacOS/build-macos.sh`, `.\WindowsOS\build-windows.ps1`, `./LinuxOS/build-linux.sh`) creates an unsigned desktop bundle under `release/`.
+```sh
+# Development build (unminified sourcemaps) or unsigned desktop bundle (release/)
+npm run dev
+npm run package
+```
+
+---
+
+## Three Live Security Visualizations
+
+| Visualization | Location | What It Computes |
+| :--- | :--- | :--- |
+| **Codebase DNA** | Right Drawer (`DNA`) | Plots every workspace file across **Shannon byte entropy (`0.00–8.00 bits/byte`)** × directory lanes × **9-CLI posture** (`Clean`, `Binary / PCAP`, `Medium / Low`, `Critical / High`). Remediated files turn `#3ddc97` green on **Rescan**. |
+| **9-CLI Security Convergence** | Main Stage Tab | Interactive 3-column bipartite graph linking installed local security engines → live workspace & authorized scope assets → corroborated CWE / supply-chain posture. |
+| **Attack Reachability** | Main Stage Tab | Maps untrusted entry surfaces (`HTTP`, `CLI`, `CI`, `Manifest`, `Capture`) → handler modules → code/artifact sinks → actionable blast radius vs. severed static false positives. |
 
 ---
 
 ## Connect a Model (Local Air-Gapped or Cloud)
 
-Open **Settings** with the gear icon or **⌘,** (`Ctrl+,` on Windows/Linux) to open the **Model Command Center**:
+Press **⌘,** (`Ctrl+,` on Windows/Linux) or click the gear icon to open **Connect your model.**:
 
-- **Local Loopback Radar (Zero Data Egress):** Automatically probes `127.0.0.1` for **Ollama (`:11434`)**, **LM Studio (`:1234`)**, **Jan (`:1337`)**, and **vLLM (`:8000`)**, lists installed local models, displays a model security-fit badge (flagging small models prone to SAST false positives vs. recommended 14B–32B+ reasoning models), and offers 1-click `ollama pull` in your active shell.
-- **Cloud Provider Presets (10 Built-In):** One-click endpoint + curated security model presets for **Anthropic Claude**, **OpenAI**, **Google Gemini**, **xAI Grok**, **DeepSeek**, **Mistral**, **Groq**, **Together AI**, **Fireworks AI**, and **OpenRouter**, plus any custom OpenAI-compatible `/chat/completions` SSE server.
-- **Connection Verification & Keychain Storage:** **Test connection** measures live round-trip streaming latency before saving. API keys are encrypted via OS-backed Electron `safeStorage` (macOS Keychain / Windows DPAPI / Linux Secret Service) and never exposed to the renderer. Switching the endpoint clears the stored key unless a new key is supplied, and HTTP redirects are rejected so credentials are never forwarded to another host.
-
----
-
-## Three Live Security Visualizations (`v0.4`)
-
-1. **Codebase DNA (`DNA` Drawer Tab):** Plots workspace files across **Shannon byte entropy (`0.00–8.00 bits/byte`)** × directory lanes × **9-CLI security posture** (`Clean`, `Binary / PCAP`, `Medium / Low`, `Critical / High`). Multi-finding files display `×N` badges; clicking any node opens its entropy profile, CLI coverage tags, active CWEs, and 1-click **Audit File →**, **Mark Mitigated ✓**, or **False Positive** actions.
-2. **9-CLI Security Convergence (Main Stage Tab):** Interactive 3-column bipartite graph beside the `Marlowe` terminal tab mapping installed local security engines (`Semgrep`, `Gitleaks`, `Trivy`, `OSV-Scanner`, `Nmap`, `Nuclei`, `TShark`, `Radare2`, `otool`) → live workspace & scope assets → corroborated CWE / artifact posture.
-3. **Attack Reachability (Main Stage Tab):** Interactive taint-reachability topology mapping untrusted entrypoints (HTTP/API inputs, CLI args, CI triggers, dependencies, artifacts) → vulnerable code/config sinks → blast radius (RCE, data egress, supply-chain compromise, or contained/mitigated).
+- **Local Loopback Radar (`Zero Data Egress`):** Automatically probes `127.0.0.1` for **Ollama (`:11434`)**, **LM Studio (`:1234`)**, **Jan (`:1337`)**, and **vLLM (`:8000`)**, inventories local weights, displays a **Security-Fit Advisor** (flagging small models prone to SAST false positives vs. 14B–32B+ reasoning coders), and triggers 1-click `ollama pull` in your active terminal.
+- **10 Cloud Provider Presets:** Built-in endpoints, auth headers (`Bearer` & Anthropic `x-api-key`), and curated AppSec model chips for **Claude**, **OpenAI**, **Gemini**, **xAI Grok**, **DeepSeek**, **Mistral**, **Groq**, **Together**, **Fireworks**, and **OpenRouter**.
+- **OS Keychain Encryption & Redirect Refusal:** Keys are encrypted via Electron `safeStorage` (macOS Keychain / Windows DPAPI / Linux Secret Service), wiped on endpoint change unless re-supplied, and never exposed to the renderer. Redirects (`3xx`) are rejected so credentials never forward across hosts.
 
 ---
 
-## Cybersecurity Workbench (`v0.4`)
+## 9-CLI Security Toolchain
 
-Marlowe operates as a multi-domain AppSec, authorized recon, and DFIR triage workbench while keeping the renderer sandboxed (`connect-src 'none'`):
+Marlowe ships **zero-dependency built-in Node.js analyzers** (`scan_secrets`, `audit_code_patterns`, `audit_dependencies` + CycloneDX 1.5 SBOM + OSV.dev, `inspect_http_security`, `inspect_tls`, `dns_recon`, `probe_ports`, `triage_artifact`, `extract_iocs`, `analyze_logs`) that work out of the box.
 
-- **Four Agent Playbooks:** **Engineering** (`12` rounds / `32` actions) plus three deep-investigation security playbooks — **AppSec Audit**, **Authorized Recon**, and **DFIR Triage** (`24` rounds / `64` actions each) — governed by strict source-to-sink taint verification before recording findings.
-- **Host-Enforced Authorized Scope (`ScopeGate`) & SSRF Guard:** Configure authorized hostnames, wildcard subdomains (`*.example.com`), URLs, or IPv4 CIDRs in **Scope**. Network inspection and scanner tools (`inspect_http_security`, `inspect_tls`, `dns_recon`, `probe_ports`, and `nmap`/`nuclei` via `run_security_scanner`) reject out-of-scope targets and block DNS resolution to loopback, RFC1918, link-local, or cloud-metadata (`169.254.169.254`) addresses unless explicitly authorized.
-- **Built-In Zero-Dependency Security Analyzers:**
-  - **AppSec & Secrets:** `scan_secrets` (signature + Shannon entropy scanner that masks raw credential values before returning results to the model, ignoring `$VAR` / `<token>` placeholders) and `audit_code_patterns` (CWE-mapped injection, XSS, deserialization, crypto, CORS, and container checks).
-  - **Supply Chain & OSV:** `audit_dependencies` inventories `package-lock.json`, `package.json`, `pnpm-lock.yaml`, `requirements.txt`, `pyproject.toml`, `go.mod`, and `Cargo.lock`, generates a CycloneDX 1.5 SBOM summary, and (when enabled in Scope) queries `api.osv.dev` with package names and versions only.
-  - **Scope-Locked Web, TLS, DNS & Port Inspection:** `inspect_http_security`, `inspect_tls`, `dns_recon`, and `probe_ports` (bounded up to 32 TCP ports; requires **Approve once**).
-  - **DFIR, Binary & Log Triage:** `triage_artifact` (`O_NOFOLLOW` inspection up to 10 MB for SHA-256/SHA-1/MD5, byte entropy, ELF/Mach-O/PE/PDF/PCAP headers, and notable strings), `extract_iocs`, and `analyze_logs`.
-- **Toolchain Doctor & Typed Scanner Wrappers:** Detects `semgrep`, `trivy`, `gitleaks`, `osv-scanner`, `nmap`, `nuclei`, `tshark`, `radare2`, and `otool` from verified login `PATH` directories outside the workspace, executing preset profiles via `spawn(binary, argv, { shell: false })` after **Approve once**, filtering noisy informational rules, and masking secrets.
-- **Auto-Reconciling Findings Ledger & SARIF Export:** `record_finding` deduplicates per-file findings and persists them locally per workspace. Editing or fixing a file and clicking **Rescan** automatically reconciles cleared findings to `mitigated` and turns **Codebase DNA** nodes green (`#3ddc97`). Supports 1-click **Dismiss Rule (×N)** suppression and exports **Markdown**, **SARIF v2.1.0**, or **JSON**.
+When external CLIs are installed on your verified login `PATH`, **Toolchain Doctor** unlocks `run_security_scanner` via `spawn(binary, argv, { shell: false })` behind **Approve once**:
+
+| CLI Engine | Domain | Execution Guard | Noise & Secret Handling |
+| :--- | :--- | :--- | :--- |
+| **`semgrep`** | AST / Taint SAST | Workspace confined · `Approve once` | Suppresses `INFO` / low-confidence noise; rolls up duplicate rule hits |
+| **`gitleaks`** | Secret Scanning | Workspace confined · `Approve once` | Masks raw tokens; skips `target/` & build artifact caches |
+| **`trivy`** | IaC, Containers & Lockfiles | Workspace confined · `Approve once` | Deduplicates per-file CVE & misconfiguration findings |
+| **`osv-scanner`** | Supply-Chain Advisories | Workspace confined · `Approve once` | Corroborates lockfile dependencies against live OSV advisories |
+| **`nmap`** | Service & Port Discovery | `ScopeGate` + DNS-rebinding check · `Approve once` | Rejects out-of-scope, RFC1918, loopback & cloud-metadata IPs |
+| **`nuclei`** | Template Verification | `ScopeGate` + DNS-rebinding check · `Approve once` | Bounded preset severity profiles |
+| **`tshark`** | PCAP Packet Forensics | Workspace confined · `Approve once` | Structured protocol & conversation summary |
+| **`radare2`** | Binary / ELF / PE Triage | Workspace confined · `Approve once` | Non-executing header, symbol & string inspection |
+| **`otool`** | macOS Mach-O Inspection | Workspace confined · `Approve once` | Linked dylibs, load commands & hardening flags *(macOS)* |
 
 ---
 
-## Agent Execution & Approval Policy
+## Architecture & Trust Boundaries
 
-1. Select **Agent** above the composer and choose a specific project folder (the home directory and disk root are refused).
-2. Describe the task or audit. Marlowe streams real tool activity cards; model prose narrating fake approvals or activity is rejected by host guards.
-3. Review action cards: **Approve once** authorizes that single action (`{ runId, approvalId }`); **Deny** skips it; **Stop** cancels the model request, pending approvals, and the active command process group on macOS/Linux.
+```mermaid
+flowchart LR
+  subgraph Renderer["Sandboxed Renderer (CSP: connect-src 'none')"]
+    UI["xterm.js Shells + Marlowe UI"]
+    VIZ["Codebase DNA · Convergence · Reachability"]
+  end
+
+  subgraph Host["Electron Main Process (Sender-Verified IPC)"]
+    AG["ApprovalGate (One-Shot Tokens)"]
+    SG["ScopeGate + DNS/SSRF Guard"]
+    FT["Workspace File Tools (O_NOFOLLOW)"]
+    TC["9-CLI Runner (shell: false)"]
+    KS["OS Keychain (safeStorage)"]
+  end
+
+  UI <-->|"preload.cjs (narrow API)"| Host
+  VIZ <-->|"cyber:dna / cyber:graphs"| Host
+  AG --> FT
+  AG --> TC
+  SG -->|"Blocks RFC1918 / 169.254.169.254"| TC
+  KS -->|"HTTPS or 127.0.0.1 SSE"| LLM["Local Loopback or Cloud LLM"]
+```
+
+### Agent Execution & Approval Policy
 
 | Action | Host Enforcement |
-| --- | --- |
-| List, find, search, and read workspace text files | Automatic; `.env*`, `.git`, SSH/cloud keys, symlinks (`O_NOFOLLOW`), hard links, and binary files are refused |
-| Built-in local passive analyzers (`scan_secrets`, `audit_code_patterns`, `triage_artifact`, `analyze_logs`, `extract_iocs`) | Automatic within the selected workspace; detected secrets are masked |
-| Create a new file | Automatic when its parent directory exists inside the workspace |
-| Focused exact-match file edits | Automatic unless they delete text, blank content, replace the entire file, or replace >100 lines |
-| Overwrite or delete an existing file | Review bounded line diff (plus full before/after file toggle) and click **Approve once** |
-| Exact `pwd`, `ls`, `ls -l`, `ls -a`, `ls -la` | Automatic via fixed system binaries on macOS/Linux |
-| Active TCP port probes, external CLI scanners, and arbitrary shell commands (`run_command`) | Review exact argv/command, working directory, scope target, and timeout, then click **Approve once** |
+| :--- | :--- |
+| List, find, search, and read workspace text files | **Automatic** — `.env*`, `.git`, SSH/cloud keys, symlinks (`O_NOFOLLOW`), hard links, and binaries are refused |
+| Built-in local passive analyzers (`scan_secrets`, `audit_code_patterns`, `triage_artifact`, `analyze_logs`, `extract_iocs`) | **Automatic** within selected workspace; raw secret values are masked before reaching the model |
+| Create new file / focused exact-match edit | **Automatic** unless deleting text, blanking content, replacing the whole file, or replacing >100 lines |
+| Overwrite or delete an existing file | **Approve once** — inspect bounded `+N −M` line diff (or full before/after file) |
+| Exact `pwd`, `ls`, `ls -l`, `ls -a`, `ls -la` | **Automatic** via fixed system binaries on macOS/Linux |
+| Active TCP port probes, external CLI scanners, and shell commands (`run_command`) | **Approve once** — inspect exact command/argv, working directory, scope target, and timeout |
 
-> **Important boundary:** Approved shell commands run as your OS user in a minimal `/bin/sh` environment and **are not OS-sandboxed** — they may access files outside the workspace or the network. File-tool path checks are not a sandbox for shell commands you approve. Always inspect the command shown on the approval card.
+> [!NOTE]
+> **Unsandboxed Shell Caveat:** Interactive terminal tabs and user-approved `run_command` actions execute as your OS user and **are not OS-sandboxed**. File-tool path restrictions do not confine shell commands you explicitly approve. Always review the command on the approval card before clicking **Approve once**.
 
-### Environment, Backups, Logs & Limits
+<details>
+<summary><b>Runtime Limits, Data Retention, Backups & Shell Integration Details</b></summary>
 
-- **Clean `PATH`-only environment:** Agent commands inherit only verified login-shell `PATH` directories outside the workspace (so Homebrew/nvm/pyenv/mise tools resolve normally, while workspace files cannot shadow approved command names) — never API keys, aliases, or arbitrary environment variables.
-- **Snapshots & Safe Undo:** File mutations save snapshots under `agent-backups/`. **Undo file change** restores a file only if it still matches the agent's exact output, protecting newer manual edits.
-- **Audit Logs & Reliability Checks:** Every run writes a local JSONL audit log under `agent-runs/`. Open **Agent reliability** in the top bar to inspect tool/guard telemetry or run deterministic offline safeguard checks (**Run checks**) in a disposable temp folder.
-- **Terminal Context Consent:** Terminal output is **off by default**. Checking **Attach terminal output** captures a one-shot snapshot (capped at `16,000` chars) that you can inspect, edit, or scrub with **Redact secrets** via **Preview** before sending. Right-clicking a terminal offers **Explain selection**, **Explain last command**, or **Help fix this error**.
-- **Connected `Marlowe` Terminal Tab:** The `Marlowe` tab beside your shell tabs mirrors live conversation and tool results using an escape-stripped line editor so model output can never inject terminal control sequences or execute shell input.
+<br />
+
+- **Playbook budgets:** `Engineering` runs up to `12` model rounds / `32` tool actions; `AppSec Audit`, `Authorized Recon`, and `DFIR Triage` run up to `24` rounds / `64` actions (`30 min` wall-clock cap including approval wait).
+- **Clean `PATH`-only command environment:** `toolchain.cjs` extracts `PATH` once from your login shell (`zsh`/`bash`/`fish`), drops relative/missing/in-workspace paths (so agent-created files cannot shadow approved command names), and strips arbitrary environment variables and API keys.
+- **Snapshots & safe Undo:** File mutations write snapshots to `agent-backups/` in `userData`. **Undo file change** restores a file only if disk contents still match the agent's output, protecting newer manual edits.
+- **Terminal context consent:** Terminal buffer sharing is **off by default**. Checking **Attach terminal output** captures a one-shot snapshot (`16,000` chars max) with **Preview** and **Redact secrets** controls before sending.
+- **Non-invasive `zsh` integration:** Session-only startup shims in `userData/shell/zsh/` track CWD, Git branch, and exit codes without modifying `~/.zshrc`.
+- **Local storage paths:**
+  - macOS: `~/Library/Application Support/Marlowe/`
+  - Windows: `%APPDATA%\Marlowe\`
+  - Linux: `~/.config/Marlowe/`
+
+</details>
 
 ---
 
 ## Validation & Tests
 
 ```sh
-npm test          # 55 unit tests: ScopeGate, SSRF guard, analyzers, findings reconciliation, provider, agent gates
-npm run test:e2e  # Playwright Electron desktop suites against a local deterministic SSE model server
+# Run 55 Node.js unit tests (ScopeGate, SSRF guard, analyzers, findings reconciliation, agent gates)
+npm test
+
+# Run Playwright Electron E2E desktop suites against a local deterministic SSE server
+env -u ELECTRON_RUN_AS_NODE npm run test:e2e
 ```
 
-Tests never call paid external APIs and run against isolated temporary `userData` directories.
+Tests run offline in isolated temporary `userData` directories and never call paid external APIs. You can also run **Agent reliability → Run checks** inside the app at any time to execute production safeguard self-tests in a disposable workspace.
 
 ---
 
 ## Project Layout
 
-- [`MacOS/`](./MacOS), [`WindowsOS/`](./WindowsOS), [`LinuxOS/`](./LinuxOS) — OS-specific setup guides, 9-CLI manifests, and packaging scripts.
-- `electron/main.cjs`, `electron/preload.cjs` — Electron lifecycle, sender-verified IPC, PTY sessions, `safeStorage` keys, local persistence.
-- `electron/provider.cjs` — Loopback runtime radar, 10 cloud provider presets, Anthropic/Gemini/OpenAI SSE streaming transport.
-- `electron/agent.cjs`, `electron/agent-tools.cjs` — Playbook loop, `ApprovalGate`, workspace file confinement, backups/Undo, and command runner.
-- `electron/cyber-scope.cjs` — `ScopeGate`, DNS-rebinding/SSRF guard, and credential redactor.
-- `electron/cyber-analyzers.cjs` — Built-in AppSec, SBOM/OSV, HTTP/TLS/DNS/TCP, DFIR, **Codebase DNA**, and **Convergence / Reachability** graph builders.
-- `electron/cyber-toolchain.cjs` — Toolchain Doctor and `shell: false` preset wrappers + noise filters for the 9 security CLIs.
-- `electron/findings.cjs` — Workspace Findings Ledger, deduplication, auto-reconciliation, and Markdown / SARIF v2.1.0 / JSON exporters.
-- `src/` — Sandboxed UI (`app.js`, `cyber.js`, `stage-graphs.js`, `benjamin-terminal.mjs`, `reliability.js`, `styles.css`, `index.html`).
-- `test/` — Node unit tests (`*.test.cjs`) and Playwright Electron E2E tests (`*.e2e.cjs`).
+```text
+marlowe/
+├── MacOS/                  # macOS setup guide, 9-CLI Brewfile & .app builder (Validated)
+├── WindowsOS/              # Windows setup guide, winget CLI script & .exe builder (Experimental)
+├── LinuxOS/                # Linux setup guide, distro CLI script & bundle builder (Experimental)
+├── electron/
+│   ├── main.cjs            # Window lifecycle, sender-verified IPC, PTYs, safeStorage
+│   ├── preload.cjs         # Narrow context-isolated renderer bridge
+│   ├── provider.cjs        # Local loopback radar + 10 cloud presets + SSE client
+│   ├── agent.cjs           # Playbook loop, claim guards & bounded tool orchestration
+│   ├── agent-tools.cjs     # O_NOFOLLOW workspace file tools, ApprovalGate & backups
+│   ├── cyber-scope.cjs     # ScopeGate, DNS-rebinding/SSRF guard & secret redactor
+│   ├── cyber-analyzers.cjs # AppSec, SBOM/OSV, TLS/HTTP/DNS, DFIR, DNA & stage graphs
+│   ├── cyber-toolchain.cjs # Toolchain Doctor & shell:false wrappers for 9 CLIs
+│   └── findings.cjs        # Deduplicated Findings Ledger, reconciliation & SARIF v2.1.0
+├── src/                    # Sandboxed UI, Codebase DNA, Convergence & Reachability maps
+└── test/                   # 55 unit tests (*.test.cjs) + 3 Electron E2E suites (*.e2e.cjs)
+```
 
 ---
 
-## Security & Licensing
+## Security & License
 
-- **Vulnerability disclosure & trust boundaries:** See **[`SECURITY.md`](./SECURITY.md)**.
-- **Source-available license:** **[PolyForm Noncommercial License 1.0.0](./LICENSE)** — Copyright (c) Zero Theory Labs.
-- **Bundled fonts & open-source notices:** See **[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)**.
+- **Vulnerability reporting & trust boundaries:** **[`SECURITY.md`](./SECURITY.md)**
+- **License:** **[PolyForm Noncommercial License 1.0.0](./LICENSE)** — Copyright © Zero Theory Labs
+- **Bundled fonts & open-source notices:** **[`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)**
