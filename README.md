@@ -1,20 +1,25 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/marlowe-banner-dark.svg" />
-  <source media="(prefers-color-scheme: light)" srcset="./docs/assets/marlowe-banner-light.svg" />
-  <img alt="Marlowe. — Security for AI. A little more careful. By Zero Theory Labs." src="./docs/assets/marlowe-banner-dark.svg" width="100%" />
-</picture>
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/marlowe-banner-dark.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="./docs/assets/marlowe-banner-light.svg" />
+    <img alt="Marlowe. — Security for AI. A little more careful. By Zero Theory Labs." src="./docs/assets/marlowe-banner-dark.svg" width="100%" />
+  </picture>
+</p>
 
-<br />
+<p>
+  <a href="https://github.com/zero-theory-labs/marlowe/releases/tag/v0.4.0"><img alt="Release v0.4.0" src="https://img.shields.io/badge/release-v0.4.0-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
+  <a href="./LICENSE"><img alt="License: PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-e5c07b?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
+  <a href="./MacOS"><img alt="macOS Validated" src="https://img.shields.io/badge/macOS-validated_(arm64_%7C_x64)-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
+  <a href="./WindowsOS"><img alt="Windows & Linux Experimental" src="https://img.shields.io/badge/Windows_%26_Linux-experimental-6ea8fe?style=flat-square&labelColor=181714" /></a>
+</p>
 
-[![Release v0.4.0](https://img.shields.io/badge/release-v0.4.0-3ddc97?style=flat-square&labelColor=181714)](https://github.com/zero-theory-labs/marlowe/releases/tag/v0.4.0)
-[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-e5c07b?style=flat-square&labelColor=181714)](./LICENSE)
-[![macOS Validated](https://img.shields.io/badge/macOS-validated_(arm64_%7C_x64)-3ddc97?style=flat-square&labelColor=181714)](./MacOS)
-[![Windows & Linux](https://img.shields.io/badge/Windows_%26_Linux-experimental-6ea8fe?style=flat-square&labelColor=181714)](./WindowsOS)
-[![Local Security CLIs](https://img.shields.io/badge/security_CLIs-9_local_engines-3ddc97?style=flat-square&labelColor=181714)](#9-cli-security-toolchain)
-[![Renderer CSP](https://img.shields.io/badge/renderer_CSP-connect--src_'none'-3ddc97?style=flat-square&labelColor=181714)](./SECURITY.md)
-[![Tests Passing](https://img.shields.io/badge/tests-55_unit_%C2%B7_3_E2E_passing-3ddc97?style=flat-square&labelColor=181714)](#validation--tests)
+<p>
+  <a href="#9-cli-security-toolchain"><img alt="9 Local Security CLIs" src="https://img.shields.io/badge/security_CLIs-9_local_engines-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
+  <a href="./SECURITY.md"><img alt="Renderer CSP: connect-src 'none'" src="https://img.shields.io/badge/renderer_CSP-connect--src_'none'-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
+  <a href="#validation--tests"><img alt="Tests Passing" src="https://img.shields.io/badge/tests-55_unit_%C2%B7_3_E2E_passing-3ddc97?style=flat-square&labelColor=181714" /></a>
+</p>
 
 <p>
   <a href="./MacOS"><b>MacOS/</b></a> &nbsp;·&nbsp;
