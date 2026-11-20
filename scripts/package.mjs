@@ -32,6 +32,7 @@ const paths = await packager({
     /^\/examples/,
     /^\/test-results/,
     /^\/playwright-report/,
+    /^\/\.github/,
     /^\/\.git($|\/)/
   ]
 });
