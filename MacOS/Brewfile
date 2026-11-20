@@ -1,0 +1,16 @@
+# Marlowe — macOS 9-CLI Security Toolchain & Optional Local LLM Runtime
+# Install from repository root with:
+#   brew bundle --file=MacOS/Brewfile
+# (Note: the 9th CLI, `otool`, ships with macOS Xcode Command Line Tools.)
+
+brew "semgrep"
+brew "gitleaks"
+brew "trivy"
+brew "osv-scanner"
+brew "nmap"
+brew "nuclei"
+brew "wireshark"    # provides `tshark` CLI without requiring the GUI cask
+brew "radare2"
+
+# Optional: local air-gapped model server (`http://127.0.0.1:11434/v1`)
+brew "ollama"

@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"><title>Marlowe. | Zero Theory Labs</title><link rel="stylesheet" href="./app.css"></head>
+<body>
+  <header class="titlebar">
+    <span class="window-space"></span>
+    <span class="zt-brand">
+      <span class="m-tile" aria-hidden="true">m<span class="m-dot">.</span></span>
+      <span class="wordmark">Marlowe<span class="wordmark-stop">.</span></span>
+      <span class="brand-sep">·</span>
+      <span class="zt-suite">Zero Theory Labs</span>
+    </span>
+    <button class="workspace-button" id="choose-folder" type="button"><span class="folder-icon">▱</span><span id="folder-name">Loading…</span><span class="chevron">⌄</span></button>
+    <div class="title-right">
+      <div class="connection-pill">
+        <span class="model-indicator"></span>
+        <button id="model-button" type="button" title="Model connection">Configure model</button>
+        <span id="connection-status" hidden></span>
+        <button class="icon-button" id="settings-button" type="button" title="Settings · ⌘," aria-label="Settings">⚙</button>
+      </div>
+      <button class="icon-button" id="reliability-button" type="button" title="Agent reliability" aria-label="Agent reliability"></button>
+      <button id="theme-toggle" class="icon-button theme-toggle" type="button" aria-label="Switch to light theme" title="Switch to light theme"></button>
+      <button type="button" class="drawer-toggle-btn" id="toggle-drawer" aria-expanded="true" title="Toggle Marlowe panel · ⌘J"><span id="toggle-drawer-icon"></span><kbd>⌘J</kbd></button>
+    </div>
+  </header>
+
+  <main class="workspace-shell">
+    <div class="workbench" id="workbench">
+      <section class="terminal-pane" aria-label="Terminal">
+        <div class="pane-bar">
+          <div class="terminal-tabs" id="terminal-tabs" role="tablist" aria-label="Terminal sessions"></div>
+          <button id="new-terminal" class="tab-add-button" type="button" title="New terminal · ⌘T" aria-label="New terminal">+</button>
+          <div class="pane-bar-spacer"></div>
+          <span class="count" id="terminal-count" title="Open sessions">0</span>
+          <button id="clear-terminal" class="icon-button" type="button" title="Clear terminal display" aria-label="Clear terminal display">↺</button>
+        </div>
+        <div class="terminal-stage" id="terminal-stage"></div>
+        <div class="failure-hud" id="failure-hud" hidden>
+          <div class="failure-hud-info">
+            <i class="glyph fails" aria-hidden="true"></i>
+            <span class="failure-hud-title" id="failure-hud-title">Command failed</span>
+            <span class="zt-tag rose" id="failure-hud-secrets" hidden></span>
+          </div>
+          <div class="failure-hud-actions">
+            <button type="button" class="primary-button failure-hud-btn" id="failure-diagnose">Mask Secret &amp; Help Fix</button>
+            <button type="button" class="icon-button failure-hud-close" id="failure-dismiss" aria-label="Dismiss error banner" title="Dismiss">×</button>
+          </div>
+        </div>
+        <div class="terminal-footer">
+          <span><span class="live-dot" id="shell-dot"></span><span id="shell-status">Starting shell</span></span>
+          <span id="app-status" class="footer-agent-status">All systems ready</span>
+          <span id="shell-path"></span>
+        </div>
+      </section>
+
+      <div class="splitter" id="splitter" role="separator" tabindex="0" aria-label="Resize terminal and conversation" aria-orientation="vertical" aria-valuemin="40" aria-valuemax="78" aria-valuenow="64"></div>
+
+      <section class="chat-pane" id="chat-pane" aria-label="Marlowe assistant and security panels">
+        <div class="pane-bar">
+          <div class="drawer-tabs" role="tablist" aria-label="Marlowe views">
+            <button type="button" role="tab" class="drawer-tab active" id="assistant-tab" aria-selected="true">Assistant</button>
+            <button type="button" role="tab" class="drawer-tab" id="findings-button" aria-selected="false" aria-label="Security findings">Findings <span id="findings-badge" class="tab-badge" hidden>0</span></button>
+            <button type="button" role="tab" class="drawer-tab" id="dna-button" aria-selected="false" aria-label="Codebase DNA entropy map">DNA</button>
+            <button type="button" role="tab" class="drawer-tab" id="scope-button" aria-selected="false" aria-label="Scope &amp; security tools">Scope <span id="scope-count-badge" class="tab-badge subtle" hidden>0</span></button>
+          </div>
+          <div class="pane-bar-spacer"></div>
+          <button class="icon-button" id="new-chat" type="button" aria-label="New conversation" title="New conversation">↗</button>
+        </div>
+
+        <!-- Tab 1: Assistant Conversation & Unified Composer -->
+        <div id="assistant-view" class="drawer-view">
+          <div class="messages" id="messages" role="log" aria-label="Conversation">
+            <div class="welcome" id="welcome">
+              <div class="welcome-top">
+                <span class="marlowe-eyebrow eyebrow">Zero Theory Labs · v0.4</span>
+                <svg class="marlowe-dots" viewBox="360 72 112 80" aria-hidden="true"><circle cx="432" cy="80" r="4"></circle><circle cx="464" cy="80" r="4"></circle><circle cx="400" cy="112" r="4"></circle><circle cx="432" cy="112" r="4"></circle><circle cx="464" cy="112" r="4"></circle><circle cx="368" cy="144" r="4"></circle><circle cx="400" cy="144" r="4"></circle><circle cx="432" cy="144" r="4"></circle><circle cx="464" cy="144" r="4"></circle></svg>
+              </div>
+              <h2>Security for AI.<br><em>A little more careful.</em></h2>
+              <p>Work in real shells on the left. Audit code, inspect scope-locked targets, or triage logs here—every tool call and prompt checked before it acts.</p>
+              <div class="suggestions">
+                <button data-prompt="Audit this workspace for hardcoded secrets, dangerous code sinks, and vulnerable dependencies, and record verified findings." data-playbook="appsec"><span>⛨</span> Audit workspace secrets, code &amp; CVEs</button>
+                <button data-prompt="Triage suspicious logs or binary artifacts in this workspace, extract IOCs, and map behaviors to MITRE ATT&amp;CK." data-playbook="dfir"><span>⌕</span> Triage logs, binaries &amp; IOCs</button>
+                <button data-prompt="Help me debug a terminal error. Ask me for the error output and what I was trying to do."><span>⌁</span> Diagnose a command error</button>
+                <button data-prompt="Help me plan a new project. Start by asking what I want to build."><span>↗</span> Plan a feature or architecture</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="composer-area">
+            <form id="chat-form" class="composer-card">
+              <div class="composer-top">
+                <label class="context-toggle"><input id="share-context" type="checkbox"><span>Attach terminal output</span></label>
+                <button class="text-button" id="preview-context" type="button">Preview</button>
+              </div>
+              <textarea id="prompt" rows="2" placeholder="Ask Marlowe, or run a security audit…" aria-label="Message Marlowe" maxlength="32000"></textarea>
+              <div class="composer-bottom">
+                <div class="mode-controls">
+                  <div class="mode-switch" role="group" aria-label="Assistant mode">
+                    <button id="chat-mode" type="button" aria-pressed="true">Chat</button>
+                    <button id="agent-mode" type="button" aria-pressed="false">Agent</button>
+                  </div>
+                  <select id="playbook-select" class="playbook-select" aria-label="Agent playbook" hidden>
+                    <option value="general">Engineering</option>
+                    <option value="appsec">AppSec Audit</option>
+                    <option value="recon">Authorized Recon</option>
+                    <option value="dfir">DFIR Triage</option>
+                  </select>
+                </div>
+                <div class="composer-send-group">
+                  <span id="mode-note" class="composer-hint" hidden></span>
+                  <button id="send-button" type="submit" aria-label="Send message" title="Send · Enter">↑</button>
+                  <button id="stop-button" type="button" hidden>■ Stop</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Tab 2: Inline Findings Vault -->
+        <div id="findings-dialog" class="drawer-view inline-panel" hidden>
+          <div class="inline-panel-scroll">
+            <div id="findings-metrics" class="findings-metrics"></div>
+            <div class="findings-toolbar">
+              <select id="findings-severity-filter" aria-label="Filter by severity"><option value="">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="info">Info</option></select>
+              <select id="findings-status-filter" aria-label="Filter by status"><option value="active" selected>Active (open &amp; verified)</option><option value="">All statuses</option><option value="open">Open</option><option value="verified">Verified</option><option value="mitigated">Mitigated</option><option value="false-positive">False positive</option></select>
+              <div class="findings-export-group">
+                <button type="button" class="secondary-button compact-btn" id="export-markdown">MD</button>
+                <button type="button" class="secondary-button compact-btn" id="export-sarif">SARIF</button>
+                <button type="button" class="secondary-button compact-btn" id="export-json">JSON</button>
+                <button type="button" class="text-button" id="clear-findings">Clear</button>
+              </div>
+            </div>
+            <p id="findings-empty" class="settings-note">No recorded findings yet. Run an AppSec, Recon, or DFIR playbook in Agent mode to record verified issues here.</p>
+            <div id="findings-list" class="findings-list"></div>
+          </div>
+        </div>
+
+        <!-- Tab 3: Codebase DNA Dot-Matrix Map (Entropy × 9-CLI Posture) -->
+        <div id="dna-dialog" class="drawer-view inline-panel" hidden>
+          <div class="inline-panel-scroll">
+            <div class="dialog-heading">
+              <div>
+                <h3>Codebase DNA</h3>
+                <p class="settings-note dna-subtitle">Shannon byte entropy (0–8 bits/byte) × 9-CLI security posture.</p>
+              </div>
+              <button type="button" class="secondary-button compact-btn" id="dna-refresh">Rescan</button>
+            </div>
+            <div id="dna-metrics" class="dna-metrics"></div>
+            <div class="dna-filter-bar" role="group" aria-label="Filter DNA dots">
+              <button type="button" class="dna-filter active" data-dna-filter="all">All files</button>
+              <button type="button" class="dna-filter" data-dna-filter="hotspots">Hotspots</button>
+              <button type="button" class="dna-filter" data-dna-filter="entropy">High entropy ≥6.4</button>
+              <button type="button" class="dna-filter" data-dna-filter="artifacts">Binaries &amp; locks</button>
+            </div>
+            <div id="dna-empty" class="settings-note" hidden>Choose a project workspace folder above (or cd into a project in zsh and click Agent) to map its file entropy &amp; security DNA.</div>
+            <div id="dna-stage-wrap" class="dna-stage-wrap">
+              <div class="dna-canvas-scroll">
+                <svg id="dna-svg" class="dna-svg" aria-label="Workspace file entropy dot-matrix map"></svg>
+              </div>
+              <div class="dna-legend">
+                <span><i class="dna-dot-key clean"></i>Clean</span>
+                <span><i class="dna-dot-key binary"></i>Binary / PCAP</span>
+                <span><i class="dna-dot-key warn"></i>Medium / Low</span>
+                <span><i class="dna-dot-key crit"></i>Critical / High</span>
+              </div>
+            </div>
+            <div id="dna-inspector" class="dna-inspector" hidden></div>
+          </div>
+        </div>
+
+        <!-- Tab 4: Inline ScopeGate & Toolchain Doctor -->
+        <div id="scope-dialog" class="drawer-view inline-panel" hidden>
+          <div class="inline-panel-scroll">
+            <form id="scope-form" class="inline-scope-form">
+              <div class="inline-section-head">
+                <div>
+                  <h3>Authorized Network Scope</h3>
+                  <p class="settings-note">HTTP, TLS, DNS, Port &amp; Nmap/Nuclei tools only probe targets listed below. Private/rebinding IPs are blocked unless explicitly added.</p>
+                </div>
+              </div>
+              <div class="scope-entry-row">
+                <input id="scope-target-input" type="text" placeholder="api.example.com, *.staging.example.com, 192.168.1.0/24" aria-label="Authorized target">
+                <button type="button" class="secondary-button compact-btn" id="add-scope-target">Add</button>
+              </div>
+              <div id="scope-targets-list" class="scope-targets-list"></div>
+              <div class="scope-toggles">
+                <label class="checkbox-label"><input id="scope-allow-osv" type="checkbox" checked> Query OSV.dev for lockfile CVEs</label>
+                <label class="checkbox-label"><input id="scope-redact-context" type="checkbox" checked> Enable secret masking in Terminal Context</label>
+              </div>
+              <div class="dialog-error" id="scope-error" role="alert"></div>
+              <div class="inline-form-actions">
+                <button type="submit" class="primary-button compact-btn" id="save-scope-button">Save scope</button>
+              </div>
+            </form>
+
+            <section class="toolchain-section">
+              <div class="dialog-heading"><h3>Toolchain Doctor</h3><div class="toolchain-actions"><button type="button" class="primary-button compact-btn" id="toolchain-install-core" hidden>Install Core Pack</button><button type="button" class="secondary-button compact-btn" id="toolchain-refresh">Refresh</button></div></div>
+              <p class="settings-note" id="toolchain-summary">Checking verified login PATH for external security scanners…</p>
+              <div id="toolchain-results" class="toolchain-grid"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <!-- Configuration & Audit Modals -->
+  <dialog id="settings-dialog">
+    <form id="settings-form">
+      <div class="dialog-heading">
+        <div>
+          <div class="marlowe-eyebrow eyebrow">Model endpoint</div>
+          <h2>Connect your model<span class="wordmark-stop">.</span></h2>
+        </div>
+        <button type="button" class="icon-button close-dialog" aria-label="Close settings">×</button>
+      </div>
+      <p class="dialog-intro">Choose a local runtime or cloud Chat Completions provider, discover installed models, and verify streaming latency.</p>
+
+      <div class="provider-presets-wrap">
+        <div class="provider-presets-label">
+          <span>PROVIDER PRESETS</span>
+          <span id="local-radar-status" class="radar-status">Scanning local ports…</span>
+        </div>
+        <div id="provider-presets" class="provider-presets" role="group" aria-label="Model server presets"></div>
+      </div>
+
+      <label>API base URL
+        <span class="endpoint-row">
+          <input id="base-url" type="url" required placeholder="https://api.openai.com/v1">
+          <button type="button" class="secondary-button compact-btn" id="fetch-models-btn">Detect models</button>
+        </span>
+      </label>
+
+      <div id="model-picker-panel" class="model-picker-panel" hidden>
+        <div class="model-picker-head">
+          <span id="model-picker-title">DISCOVERED MODELS</span>
+          <span id="model-picker-meta"></span>
+        </div>
+        <div id="model-picker-chips" class="model-picker-chips"></div>
+        <div id="ollama-pull-bar" class="ollama-pull-bar" hidden></div>
+      </div>
+
+      <label>Model ID<input id="model-id" required placeholder="Your provider's model ID"></label>
+      <div id="model-advisor" class="model-advisor" hidden></div>
+
+      <label>API key <span class="optional" id="api-key-badge">optional for local models</span><input id="api-key" type="password" autocomplete="off" placeholder="Enter API key"></label>
+      <label class="checkbox-label"><input id="clear-key" type="checkbox"> Remove saved API key</label>
+      <div class="settings-note" id="key-note">Your key is encrypted with your operating system and stays outside the interface.</div>
+      <p class="settings-note">Changing the endpoint clears the existing key unless you enter a new one. Chat messages and any terminal output you include are sent to this endpoint. Conversation history is saved locally.</p>
+      <div class="dialog-error" id="settings-error" role="alert"></div>
+      <div id="settings-test-result" class="settings-test-result" role="status" hidden></div>
+      <div class="dialog-footer">
+        <span>MARLOWE. · ZERO THEORY LABS</span>
+        <div class="dialog-footer-actions">
+          <button type="button" class="secondary-button" id="test-connection-btn">Test connection</button>
+          <button type="submit" class="primary-button">Save connection <span>→</span></button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="context-dialog"><div class="dialog-heading"><div><div class="marlowe-eyebrow eyebrow">Explicit consent</div><h2>Terminal context<span class="wordmark-stop">.</span></h2></div><button class="icon-button close-dialog" aria-label="Close preview">×</button></div><p class="dialog-intro" id="context-description">The most recent visible output from the active terminal, up to 16,000 characters. Check for secrets before including it.</p><pre id="context-preview"></pre><textarea id="context-editor" aria-label="Review terminal context" maxlength="16000" spellcheck="false" hidden></textarea><div id="context-review-actions" class="confirm-actions" hidden><button class="secondary-button close-dialog">Cancel</button><button class="secondary-button" id="redact-context" type="button">Redact secrets</button><button class="primary-button" id="attach-context">Attach to draft</button></div></dialog>
+  <dialog id="new-chat-dialog"><h2>Start a fresh conversation?</h2><p class="dialog-intro">This clears the conversation saved on this device. Your terminal sessions stay open.</p><div class="confirm-actions"><button class="secondary-button close-dialog">Keep conversation</button><button class="primary-button" id="confirm-new-chat">Start fresh</button></div></dialog>
+  <dialog id="reliability-dialog" aria-labelledby="reliability-title"><div class="dialog-heading"><div><div class="marlowe-eyebrow eyebrow">Decision record</div><h2 id="reliability-title">Agent reliability<span class="wordmark-stop">.</span></h2></div><button class="icon-button close-dialog" aria-label="Close reliability">×</button></div>
+    <p class="dialog-intro">Local run evidence across models and app versions. Every check reports holds, fails, or unmeasured — unknown is never rounded to a pass.</p>
+    <div class="reliability-controls"><label>Model <select id="reliability-model"><option value="">All models</option></select></label><label>App version <select id="reliability-version"><option value="">All versions</option></select></label><button class="secondary-button" id="reliability-refresh">Refresh</button></div>
+    <p id="reliability-notice" role="status"></p><div id="reliability-metrics" class="reliability-metrics"></div>
+    <h3>Run history</h3><p class="settings-note">Expand a run for tool outcomes and approval decisions. File contents and command output are not displayed here.</p><div id="reliability-runs"></div>
+    <section class="reliability-checks"><div class="dialog-heading"><h3>Recovery &amp; approval checks</h3><button class="secondary-button" id="reliability-check">Run checks</button></div><p class="settings-note">Tests Marlowe’s safeguards with simulated model replies and isolated temporary files. No model requests, project changes, or network access. Results are not a model benchmark.</p><div id="reliability-check-results" aria-live="polite"></div></section>
+  </dialog>
+  <script src="./app.js"></script>
+</body></html>

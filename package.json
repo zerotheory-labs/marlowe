@@ -1,0 +1,53 @@
+{
+  "name": "marlowe-terminal",
+  "productName": "Marlowe",
+  "version": "0.4.0",
+  "description": "Marlowe. — Security for AI. Desktop terminal & cybersecurity workbench by Zero Theory Labs.",
+  "main": "electron/main.cjs",
+  "homepage": "https://github.com/zero-theory-labs/marlowe",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zero-theory-labs/marlowe.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zero-theory-labs/marlowe/issues"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "npm run build && electron .",
+    "dev": "node scripts/build.mjs --dev && electron .",
+    "postinstall": "electron-rebuild -f -w node-pty",
+    "test": "node --test test/*.test.cjs",
+    "test:e2e": "npm run build && playwright test",
+    "record:videos": "npm run build && env -u ELECTRON_RUN_AS_NODE node scripts/record-videos.cjs",
+    "package": "npm run build && node scripts/package.mjs",
+    "package:macos": "npm run build && node scripts/package.mjs --platform=darwin",
+    "package:windows": "npm run build && node scripts/package.mjs --platform=win32",
+    "package:linux": "npm run build && node scripts/package.mjs --platform=linux"
+  },
+  "keywords": [
+    "security",
+    "appsec",
+    "terminal",
+    "electron",
+    "dfir",
+    "sbom",
+    "sarif",
+    "ai-security"
+  ],
+  "author": "Zero Theory Labs",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "type": "commonjs",
+  "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.1.0"
+  },
+  "devDependencies": {
+    "@electron/packager": "^20.3.0",
+    "@electron/rebuild": "4.2.1",
+    "@playwright/test": "^1.65.1",
+    "electron": "^45.3.3",
+    "esbuild": "^0.28.2"
+  }
+}

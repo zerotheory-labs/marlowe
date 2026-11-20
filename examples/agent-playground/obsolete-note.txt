@@ -1,0 +1,2 @@
+Disposable file for Benjamin's destructive-action approval test.
+Delete this only after the user approves the exact delete_file action.
