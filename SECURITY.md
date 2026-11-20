@@ -13,7 +13,7 @@ Please **do not** open a public GitHub issue for suspected security vulnerabilit
 
 Instead, report vulnerabilities privately through **GitHub Private Vulnerability Reporting** on this repository:
 
-- `https://github.com/zero-theory-labs/marlowe/security/advisories/new`
+- `https://github.com/zerotheory-labs/marlowe/security/advisories/new`
 
 Include:
 1. Affected version, operating system, and commit hash.

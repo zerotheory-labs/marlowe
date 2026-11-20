@@ -4,13 +4,13 @@
   "version": "0.4.0",
   "description": "Marlowe. — Security for AI. Desktop terminal & cybersecurity workbench by Zero Theory Labs.",
   "main": "electron/main.cjs",
-  "homepage": "https://github.com/zero-theory-labs/marlowe",
+  "homepage": "https://github.com/zerotheory-labs/marlowe",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zero-theory-labs/marlowe.git"
+    "url": "https://github.com/zerotheory-labs/marlowe.git"
   },
   "bugs": {
-    "url": "https://github.com/zero-theory-labs/marlowe/issues"
+    "url": "https://github.com/zerotheory-labs/marlowe/issues"
   },
   "scripts": {
     "build": "node scripts/build.mjs",

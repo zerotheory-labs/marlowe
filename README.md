@@ -9,7 +9,7 @@
 </p>
 
 <p>
-  <a href="https://github.com/zero-theory-labs/marlowe/releases/tag/v0.4.0"><img alt="Release v0.4.0" src="https://img.shields.io/badge/release-v0.4.0-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
+  <a href="https://github.com/zerotheory-labs/marlowe/releases/tag/v0.4.0"><img alt="Release v0.4.0" src="https://img.shields.io/badge/release-v0.4.0-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./LICENSE"><img alt="License: PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-e5c07b?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./MacOS"><img alt="macOS Validated" src="https://img.shields.io/badge/macOS-validated_(arm64_%7C_x64)-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./WindowsOS"><img alt="Windows & Linux Experimental" src="https://img.shields.io/badge/Windows_%26_Linux-experimental-6ea8fe?style=flat-square&labelColor=181714" /></a>
@@ -36,7 +36,7 @@
 
 ---
 
-**Marlowe.** (`v0.4.0`, by **[Zero Theory Labs](https://github.com/zero-theory-labs)**) is a source-available desktop terminal and cybersecurity workbench. It pairs real interactive shells (`node-pty` + `xterm.js`) with a taint-verifying security agent, **Codebase DNA** entropy mapping, **9-CLI Security Convergence** & **Attack Reachability** graphs, host-enforced **Approve once** gates, `ScopeGate` SSRF confinement, and **SARIF v2.1.0** finding ledgers.
+**Marlowe.** (`v0.4.0`, by **[Zero Theory Labs](https://github.com/zerotheory-labs)**) is a source-available desktop terminal and cybersecurity workbench. It pairs real interactive shells (`node-pty` + `xterm.js`) with a taint-verifying security agent, **Codebase DNA** entropy mapping, **9-CLI Security Convergence** & **Attack Reachability** graphs, host-enforced **Approve once** gates, `ScopeGate` SSRF confinement, and **SARIF v2.1.0** finding ledgers.
 
 <p align="center">
   <img src="./docs/assets/hero-convergence.png" alt="Marlowe — 9-CLI Security Convergence alongside Codebase DNA" width="100%" />
@@ -78,7 +78,7 @@ Requires **Node.js `22.12+`** and `npm` (plus C++ build tools to compile `node-p
 
 ```sh
 # 1. Clone the repository
-git clone https://github.com/zero-theory-labs/marlowe.git
+git clone https://github.com/zerotheory-labs/marlowe.git
 cd marlowe
 
 # 2. (macOS optional) Install all 9 local security CLIs + Ollama
