@@ -1,10 +1,12 @@
-# Marlowe for Linux
+# Marlowe for Linux (`EXPERIMENTAL`)
 
-**Status:** Experimental / Not Yet Host-Validated (`Ubuntu 22.04+ / Debian 12+ / Fedora / Arch`, `x64` & `arm64`)
+![Status: EXPERIMENTAL](https://img.shields.io/badge/status-EXPERIMENTAL_(not_yet_host--validated)-e5c07b?style=flat-square&labelColor=181714)
+![Targets](https://img.shields.io/badge/targets-Ubuntu_%7C_Debian_%7C_Fedora_%7C_Arch_(x64_%7C_arm64)-6ea8fe?style=flat-square&labelColor=181714)
+
+> [!WARNING]
+> **EXPERIMENTAL BUILD — NOT YET HOST-VALIDATED:** `Marlowe v0.4.0` has been exercised end-to-end on **macOS**. On Linux, POSIX PTY process-group isolation, `O_NOFOLLOW` workspace confinement, ELF binary triage, and `zsh` prompt hooks use the same Unix primitives, but desktop keyring behavior (`libsecret` / KWallet for Electron `safeStorage`) and distro-specific Chromium sandbox profiles have not yet been host-validated across Linux distributions. Please report any platform issues on GitHub.
 
 Marlowe shares a single cross-platform Electron + Node.js codebase at the repository root (`../electron` and `../src`). This directory contains Linux setup documentation, a security-CLI reference installer, and the Linux desktop packager helper.
-
-> **Platform honesty note:** The `v0.4.0` release has been exercised end-to-end on macOS. On Linux, POSIX PTY process-group isolation, `O_NOFOLLOW` confinement, ELF header triage, and `zsh` prompt hooks share the same Unix primitives, but desktop keyring behavior (`libsecret` / KWallet for Electron `safeStorage`) has not yet been host-validated across Linux distributions.
 
 ---
 

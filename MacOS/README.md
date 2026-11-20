@@ -1,6 +1,7 @@
 # Marlowe for macOS
 
-**Status:** Exercised & Validated (`macOS 14+`, Apple Silicon `arm64` & Intel `x64`)
+![Status: VALIDATED](https://img.shields.io/badge/status-EXERCISED_%26_VALIDATED-3ddc97?style=flat-square&labelColor=181714)
+![Targets](https://img.shields.io/badge/targets-macOS_14%2B_(arm64_%7C_x64)-3ddc97?style=flat-square&labelColor=181714)
 
 Marlowe shares a single cross-platform Electron + Node.js codebase at the repository root (`../electron` and `../src`). This directory contains macOS-specific setup, the 9-CLI Homebrew manifest (`Brewfile`), and the `.app` bundle builder.
 

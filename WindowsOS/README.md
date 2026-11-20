@@ -1,10 +1,12 @@
-# Marlowe for Windows
+# Marlowe for Windows (`EXPERIMENTAL`)
 
-**Status:** Experimental / Not Yet Host-Validated (`Windows 11 x64 / arm64`)
+![Status: EXPERIMENTAL](https://img.shields.io/badge/status-EXPERIMENTAL_(not_yet_host--validated)-e5c07b?style=flat-square&labelColor=181714)
+![Targets](https://img.shields.io/badge/targets-Windows_11_(x64_%7C_arm64)-6ea8fe?style=flat-square&labelColor=181714)
+
+> [!WARNING]
+> **EXPERIMENTAL BUILD — NOT YET HOST-VALIDATED:** `Marlowe v0.4.0` has been exercised end-to-end on **macOS**. Windows ConPTY sessions (`PowerShell` / `cmd.exe`), DPAPI key encryption (`safeStorage`), `;`-delimited `.exe` Toolchain Doctor lookup, and all Node.js security analyzers are implemented, while `zsh`-specific prompt hooks, `otool` (macOS Mach-O only), and Windows shell process-tree cancellation have not yet been validated on a physical Windows host. Please report any platform issues on GitHub.
 
 Marlowe shares a single cross-platform Electron + Node.js codebase at the repository root (`../electron` and `../src`). This directory contains Windows setup documentation, an optional security-CLI installer script, and the `win32` desktop packager helper.
-
-> **Platform honesty note:** The `v0.4.0` release has been exercised end-to-end on macOS. Windows PTY sessions (`PowerShell` / `cmd.exe` via ConPTY), DPAPI key encryption (`safeStorage`), and core Node.js analyzers are cross-platform, while zsh-specific prompt hooks, `otool` (macOS Mach-O only), and Windows shell process-tree cancellation have not yet been validated on a Windows host.
 
 ---
 
