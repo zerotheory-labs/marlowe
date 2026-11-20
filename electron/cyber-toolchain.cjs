@@ -9,56 +9,145 @@ const { checkTargetScopeSync, assertTargetInScope, redactSecrets } = require('./
 
 const execFileAsync = promisify(execFile);
 
+function hintFor(specId) {
+  if (process.platform === 'win32') {
+    const winHints = {
+      semgrep: 'pip install semgrep',
+      trivy: 'winget install AquaSecurity.Trivy',
+      gitleaks: 'winget install Gitleaks.Gitleaks',
+      'osv-scanner': 'winget install Google.OSVScanner',
+      nmap: 'winget install Insecure.Nmap',
+      nuclei: 'winget install ProjectDiscovery.Nuclei',
+      tshark: 'winget install WiresharkFoundation.Wireshark',
+      radare2: 'winget install RadareOrg.Radare2',
+      otool: 'macOS only (use radare2 on Windows)'
+    };
+    return winHints[specId] || '';
+  }
+  if (process.platform === 'linux') {
+    const linuxHints = {
+      semgrep: 'pipx install semgrep',
+      trivy: 'brew install trivy (or distro repo)',
+      gitleaks: 'brew install gitleaks (or distro repo)',
+      'osv-scanner': 'brew install osv-scanner',
+      nmap: 'sudo apt install nmap',
+      nuclei: 'brew install nuclei',
+      tshark: 'sudo apt install tshark',
+      radare2: 'sudo apt install radare2',
+      otool: 'macOS only (use radare2 on Linux)'
+    };
+    return linuxHints[specId] || '';
+  }
+  const macHints = {
+    semgrep: 'brew install semgrep',
+    trivy: 'brew install trivy',
+    gitleaks: 'brew install gitleaks',
+    'osv-scanner': 'brew install osv-scanner',
+    nmap: 'brew install nmap',
+    nuclei: 'brew install nuclei',
+    tshark: 'brew install wireshark',
+    radare2: 'brew install radare2',
+    otool: 'xcode-select --install'
+  };
+  return macHints[specId] || '';
+}
+
 const TOOL_CATALOG = [
-  { id: 'semgrep', binary: 'semgrep', label: 'Semgrep', category: 'SAST / Code Audit', versionArgs: ['--version'], installHint: 'brew install semgrep', runnable: true, profiles: ['auto', 'owasp-top-ten', 'secrets'] },
-  { id: 'trivy', binary: 'trivy', label: 'Trivy', category: 'Vuln / IaC / Config', versionArgs: ['--version'], installHint: 'brew install trivy', runnable: true, profiles: ['fs-vuln', 'fs-misconfig', 'fs-all'] },
-  { id: 'gitleaks', binary: 'gitleaks', label: 'Gitleaks', category: 'Secret Detection', versionArgs: ['version'], installHint: 'brew install gitleaks', runnable: true, profiles: ['dir-no-git'] },
-  { id: 'osv-scanner', binary: 'osv-scanner', label: 'OSV-Scanner', category: 'Supply Chain CVEs', versionArgs: ['--version'], installHint: 'brew install osv-scanner', runnable: true, profiles: ['workspace'] },
-  { id: 'nmap', binary: 'nmap', label: 'Nmap', category: 'Scope-Gated Network', versionArgs: ['--version'], installHint: 'brew install nmap', runnable: true, network: true, profiles: ['top-100-ports', 'service-version'] },
-  { id: 'nuclei', binary: 'nuclei', label: 'Nuclei', category: 'Scope-Gated Web/Template', versionArgs: ['-version'], installHint: 'brew install nuclei', runnable: true, network: true, profiles: ['misconfiguration', 'exposures', 'cves-safe'] },
-  { id: 'tshark', binary: 'tshark', label: 'TShark (Wireshark CLI)', category: 'Packet / PCAP Forensics', versionArgs: ['--version'], installHint: 'brew install wireshark', runnable: false, profiles: [] },
-  { id: 'radare2', binary: 'radare2', label: 'Radare2', category: 'Binary Reverse Engineering', versionArgs: ['-v'], installHint: 'brew install radare2', runnable: false, profiles: [] },
-  { id: 'otool', binary: 'otool', label: 'otool (macOS Mach-O)', category: 'Binary Inspection', versionArgs: ['--version'], installHint: 'xcode-select --install', runnable: false, profiles: [] }
+  { id: 'semgrep', binary: 'semgrep', label: 'Semgrep', category: 'SAST / Code Audit', versionArgs: ['--version'], installHint: hintFor('semgrep'), runnable: true, profiles: ['auto', 'owasp-top-ten', 'secrets'] },
+  { id: 'trivy', binary: 'trivy', label: 'Trivy', category: 'Vuln / IaC / Config', versionArgs: ['--version'], installHint: hintFor('trivy'), runnable: true, profiles: ['fs-vuln', 'fs-misconfig', 'fs-all'] },
+  { id: 'gitleaks', binary: 'gitleaks', label: 'Gitleaks', category: 'Secret Detection', versionArgs: ['version'], installHint: hintFor('gitleaks'), runnable: true, profiles: ['dir-no-git'] },
+  { id: 'osv-scanner', binary: 'osv-scanner', label: 'OSV-Scanner', category: 'Supply Chain CVEs', versionArgs: ['--version'], installHint: hintFor('osv-scanner'), runnable: true, profiles: ['workspace'] },
+  { id: 'nmap', binary: 'nmap', label: 'Nmap', category: 'Scope-Gated Network', versionArgs: ['--version'], installHint: hintFor('nmap'), runnable: true, network: true, profiles: ['top-100-ports', 'service-version'] },
+  { id: 'nuclei', binary: 'nuclei', label: 'Nuclei', category: 'Scope-Gated Web/Template', versionArgs: ['-version'], installHint: hintFor('nuclei'), runnable: true, network: true, profiles: ['misconfiguration', 'exposures', 'cves-safe'] },
+  { id: 'tshark', binary: 'tshark', label: 'TShark (Wireshark CLI)', category: 'Packet / PCAP Forensics', versionArgs: ['--version'], installHint: hintFor('tshark'), runnable: false, profiles: [] },
+  { id: 'radare2', binary: 'radare2', label: 'Radare2', category: 'Binary Reverse Engineering', versionArgs: ['-v'], installHint: hintFor('radare2'), runnable: false, profiles: [] },
+  { id: 'otool', binary: 'otool', label: 'otool (macOS Mach-O)', category: 'Binary Inspection', versionArgs: ['--version'], installHint: hintFor('otool'), runnable: false, profiles: [] }
 ];
 
-async function safeSearchDirs(commandPath = '', root = '') {
-  const raw = (commandPath || DEFAULT_PATH).split(':').filter(Boolean);
+function isInsideWorkspace(candidateReal, workspaceReal, platform = process.platform) {
+  if (!workspaceReal) return false;
+  if (platform === 'win32') {
+    const a = candidateReal.toLowerCase(), b = workspaceReal.toLowerCase();
+    return a === b || a.startsWith(b.endsWith('\\') ? b : b + '\\');
+  }
+  return candidateReal === workspaceReal || candidateReal.startsWith(workspaceReal + path.sep);
+}
+
+async function safeSearchDirs(commandPath = '', root = '', { platform = process.platform, envPath = process.env.Path || process.env.PATH || '' } = {}) {
+  const delim = platform === 'win32' ? ';' : ':';
+  const fallback = platform === 'win32' ? envPath : DEFAULT_PATH;
+  const raw = (commandPath || fallback).split(delim).map(s => s.trim()).filter(Boolean);
   const dirs = [];
   const realRoot = root ? await fs.realpath(root).catch(() => root) : '';
+  const pathMod = platform === 'win32' ? path.win32 : path;
   for (const dir of raw.slice(0, 200)) {
-    if (!path.isAbsolute(dir) || dirs.includes(dir)) continue;
+    if (!pathMod.isAbsolute(dir) || dirs.includes(dir)) continue;
     try {
       const real = await fs.realpath(dir);
-      if (realRoot && (real === realRoot || real.startsWith(realRoot + path.sep))) continue;
-      if ((await fs.stat(real)).isDirectory()) dirs.push(real);
+      if (isInsideWorkspace(real, realRoot, platform)) continue;
+      if ((await fs.stat(real)).isDirectory() && !dirs.includes(real)) dirs.push(real);
     } catch { /* Ignore missing PATH entries. */ }
   }
   return dirs;
 }
 
-async function resolveToolBinary(binaryName, commandPath = '', root = '') {
-  const dirs = await safeSearchDirs(commandPath, root);
+function candidateBinaryNames(binaryName, platform = process.platform) {
+  if (platform === 'win32' && !binaryName.toLowerCase().endsWith('.exe')) {
+    return [`${binaryName}.exe`, binaryName];
+  }
+  return [binaryName];
+}
+
+async function resolveToolBinary(binaryName, commandPath = '', root = '', options = {}) {
+  const platform = options.platform || process.platform;
+  const dirs = await safeSearchDirs(commandPath, root, options);
+  const names = candidateBinaryNames(binaryName, platform);
+  const mode = platform === 'win32' ? constants.F_OK : constants.X_OK;
   for (const dir of dirs) {
-    const candidate = path.join(dir, binaryName);
-    try {
-      await fs.access(candidate, constants.X_OK);
-      const stat = await fs.stat(candidate);
-      if (stat.isFile()) return candidate;
-    } catch { /* Continue searching PATH. */ }
+    for (const name of names) {
+      const candidate = path.join(dir, name);
+      try {
+        await fs.access(candidate, mode);
+        const stat = await fs.stat(candidate);
+        if (stat.isFile()) return candidate;
+      } catch { /* Continue searching PATH. */ }
+    }
   }
   return null;
 }
 
-async function detectSecurityTools(commandPath = '', { root = '', execFileImpl = execFileAsync } = {}) {
-  const dirs = await safeSearchDirs(commandPath, root);
+function toolSpawnEnv(dirs, platform = process.platform) {
+  const delim = platform === 'win32' ? ';' : ':';
+  return {
+    PATH: dirs.join(delim) || (platform === 'win32' ? (process.env.Path || process.env.PATH || '') : DEFAULT_PATH),
+    HOME: os.homedir(),
+    TMPDIR: os.tmpdir(),
+    LANG: 'en_US.UTF-8',
+    NO_COLOR: '1',
+    ...(platform === 'win32' ? {
+      SystemRoot: process.env.SystemRoot || 'C:\\Windows',
+      USERPROFILE: process.env.USERPROFILE || os.homedir(),
+      APPDATA: process.env.APPDATA || '',
+      LOCALAPPDATA: process.env.LOCALAPPDATA || ''
+    } : {})
+  };
+}
+
+async function detectSecurityTools(commandPath = '', { root = '', execFileImpl = execFileAsync, platform = process.platform, envPath } = {}) {
+  const dirs = await safeSearchDirs(commandPath, root, { platform, ...(envPath !== undefined ? { envPath } : {}) });
+  const namesFor = bin => candidateBinaryNames(bin, platform);
+  const mode = platform === 'win32' ? constants.F_OK : constants.X_OK;
   const tools = await Promise.all(TOOL_CATALOG.map(async spec => {
     let binaryPath = null;
     for (const dir of dirs) {
-      const candidate = path.join(dir, spec.binary);
-      try {
-        await fs.access(candidate, constants.X_OK);
-        if ((await fs.stat(candidate)).isFile()) { binaryPath = candidate; break; }
-      } catch {}
+      for (const name of namesFor(spec.binary)) {
+        const candidate = path.join(dir, name);
+        try {
+          await fs.access(candidate, mode);
+          if ((await fs.stat(candidate)).isFile()) { binaryPath = candidate; break; }
+        } catch {}
+      }
+      if (binaryPath) break;
     }
     if (!binaryPath) {
       return { id: spec.id, label: spec.label, category: spec.category, available: false, runnable: spec.runnable, profiles: spec.profiles, binaryPath: '', version: '', installHint: spec.installHint };
@@ -67,7 +156,7 @@ async function detectSecurityTools(commandPath = '', { root = '', execFileImpl =
     try {
       const { stdout = '', stderr = '' } = await execFileImpl(binaryPath, spec.versionArgs, {
         timeout: 2500,
-        env: { PATH: dirs.join(':') || DEFAULT_PATH, HOME: os.homedir(), LANG: 'en_US.UTF-8', NO_COLOR: '1' }
+        env: toolSpawnEnv(dirs, platform)
       });
       const firstLine = (stdout || stderr).split(/\r?\n/).map(s => s.trim()).find(Boolean);
       if (firstLine) version = firstLine.slice(0, 90);
@@ -220,7 +309,7 @@ async function executeScannerRun(plan, { root, scope, commandPath = '', signal, 
   }
   const binaryPath = await resolveToolBinary(spec.binary, commandPath, root);
   if (!binaryPath) {
-    throw new Error(`${spec.label} ("${spec.binary}") is not installed on the verified PATH. Install it (for example: ${spec.installHint}) or use Benjamin's built-in analyzers.`);
+    throw new Error(`${spec.label} ("${spec.binary}") is not installed on the verified PATH. Install it (for example: ${spec.installHint}) or use Marlowe's built-in analyzers.`);
   }
   const safeDirs = await safeSearchDirs(commandPath, root);
   const seconds = plan.seconds || 120;
@@ -231,13 +320,7 @@ async function executeScannerRun(plan, { root, scope, commandPath = '', signal, 
       shell: false,
       detached: process.platform !== 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: {
-        PATH: safeDirs.join(':') || DEFAULT_PATH,
-        HOME: os.homedir(),
-        TMPDIR: os.tmpdir(),
-        LANG: 'en_US.UTF-8',
-        NO_COLOR: '1'
-      }
+      env: toolSpawnEnv(safeDirs)
     });
     const kill = () => {
       if (!child.pid) return;

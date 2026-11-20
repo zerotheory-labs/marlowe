@@ -260,29 +260,46 @@ test('DFIR tools triage ELF/Mach-O binaries, extract IOCs, and detect attack spi
 }));
 
 test('Toolchain Doctor ignores workspace binaries and executes external scanners without shell interpolation', () => fixture(async f => {
-  // Drop a rogue binary inside the workspace: must NEVER be trusted.
-  await fs.writeFile(path.join(f.root, 'semgrep'), '#!/bin/sh\necho PWNED\n', { mode: 0o755 });
-  const trustedBin = path.join(f.dir, 'trusted-bin');
-  await fs.mkdir(trustedBin);
-  await fs.writeFile(path.join(trustedBin, 'semgrep'), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "1.99.0"; exit 0; fi\nprintf \'{"results":[{"check_id":"js.sqli","path":"app.js","start":{"line":9},"extra":{"severity":"ERROR","message":"SQLi found"}},{"check_id":"js.sqli","path":"app.js","start":{"line":19},"extra":{"severity":"ERROR","message":"SQLi found"}},{"check_id":"yaml.github-actions.security.third-party-action-not-pinned-to-commit-sha","path":".github/workflows/ci.yml","start":{"line":20},"extra":{"severity":"ERROR","message":"Mutable tag"}}]}\'\n', { mode: 0o755 });
-
-  const doctorFromWorkspace = await detectSecurityTools(f.root, { root: f.root });
-  assert.equal(doctorFromWorkspace.tools.find(t => t.id === 'semgrep').available, false);
-
-  const doctorTrusted = await detectSecurityTools(trustedBin, { root: f.root });
-  const semgrepInfo = doctorTrusted.tools.find(t => t.id === 'semgrep');
-  assert.equal(semgrepInfo.available, true);
-  assert.equal(semgrepInfo.version, '1.99.0');
-
-  // Target starting with "-" is rejected to block flag injection.
+  // Target starting with "-" is rejected to block flag injection on all OSes.
   await assert.rejects(prepareTool(f.root, 'run_security_scanner', { scanner: 'semgrep', target: '--config=/etc/passwd' }), /cannot start with "-"/);
 
-  const scanPlan = await prepareTool(f.root, 'run_security_scanner', { scanner: 'semgrep', target: '.', profile: 'owasp-top-ten' });
-  assert.ok(scanPlan.reason.includes('External security CLI'));
-  const scanRes = await executeTool(f.root, scanPlan, { ...f, commandPath: `${trustedBin}:/usr/bin:/bin` });
-  assert.equal(scanRes.exitCode, 0);
-  assert.equal(scanRes.structuredFindingsCount, 1);
-  assert.equal(scanRes.structuredFindings[0].rule, 'js.sqli');
+  if (process.platform !== 'win32') {
+    // Drop a rogue binary inside the workspace: must NEVER be trusted.
+    await fs.writeFile(path.join(f.root, 'semgrep'), '#!/bin/sh\necho PWNED\n', { mode: 0o755 });
+    const trustedBin = path.join(f.dir, 'trusted-bin');
+    await fs.mkdir(trustedBin);
+    await fs.writeFile(path.join(trustedBin, 'semgrep'), '#!/bin/sh\nif [ "$1" = "--version" ]; then echo "1.99.0"; exit 0; fi\nprintf \'{"results":[{"check_id":"js.sqli","path":"app.js","start":{"line":9},"extra":{"severity":"ERROR","message":"SQLi found"}},{"check_id":"js.sqli","path":"app.js","start":{"line":19},"extra":{"severity":"ERROR","message":"SQLi found"}},{"check_id":"yaml.github-actions.security.third-party-action-not-pinned-to-commit-sha","path":".github/workflows/ci.yml","start":{"line":20},"extra":{"severity":"ERROR","message":"Mutable tag"}}]}\'\n', { mode: 0o755 });
+
+    const doctorFromWorkspace = await detectSecurityTools(f.root, { root: f.root });
+    assert.equal(doctorFromWorkspace.tools.find(t => t.id === 'semgrep').available, false);
+
+    const doctorTrusted = await detectSecurityTools(trustedBin, { root: f.root });
+    const semgrepInfo = doctorTrusted.tools.find(t => t.id === 'semgrep');
+    assert.equal(semgrepInfo.available, true);
+    assert.equal(semgrepInfo.version, '1.99.0');
+
+    const scanPlan = await prepareTool(f.root, 'run_security_scanner', { scanner: 'semgrep', target: '.', profile: 'owasp-top-ten' });
+    assert.ok(scanPlan.reason.includes('External security CLI'));
+    const scanRes = await executeTool(f.root, scanPlan, { ...f, commandPath: `${trustedBin}:/usr/bin:/bin` });
+    assert.equal(scanRes.exitCode, 0);
+    assert.equal(scanRes.structuredFindingsCount, 1);
+    assert.equal(scanRes.structuredFindings[0].rule, 'js.sqli');
+  }
+
+  // Windows win32 mode: splits semicolon PATH, resolves .exe binaries, and still excludes workspace dirs.
+  const winBin = path.join(f.dir, 'win-bin');
+  await fs.mkdir(winBin);
+  await fs.writeFile(path.join(winBin, 'gitleaks.exe'), 'MZ-fake');
+  await fs.writeFile(path.join(f.root, 'trivy.exe'), 'MZ-rogue-inside-workspace');
+  const winDoctor = await detectSecurityTools('', {
+    root: f.root,
+    platform: 'win32',
+    envPath: `${f.root};${winBin}`,
+    execFileImpl: async () => ({ stdout: '8.24.0\r\n', stderr: '' })
+  });
+  assert.equal(winDoctor.tools.find(t => t.id === 'gitleaks').available, true);
+  assert.equal(winDoctor.tools.find(t => t.id === 'gitleaks').version, '8.24.0');
+  assert.equal(winDoctor.tools.find(t => t.id === 'trivy').available, false);
 }));
 
 test('Findings Ledger deduplicates entries, exports Markdown & SARIF v2.1.0, and works in appsec playbook runs', () => fixture(async f => {

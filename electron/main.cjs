@@ -80,7 +80,7 @@ function registerHandlers() {
   });
   handle('app:boot', async () => ({
     settings: publicSettings(), scope, findings: folderChosen ? await findingsStore.list(folder) : [],
-    history, folder, folderChosen, platform: process.platform, shell: path.basename(process.env.SHELL || '/bin/zsh')
+    history, folder, folderChosen, platform: process.platform, shell: process.platform === 'win32' ? 'powershell.exe' : path.basename(process.env.SHELL || '/bin/zsh')
   }));
   handle('app:folder', async () => {
     if (activeRequest) throw new Error('Stop the active run before changing workspace.');

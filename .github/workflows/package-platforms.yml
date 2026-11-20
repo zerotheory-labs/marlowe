@@ -1,0 +1,62 @@
+name: Build Native OS Bundles (macOS, Windows, Linux)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS-arm64
+            os: macos-latest
+            platform: darwin
+            arch: arm64
+          - label: Windows-x64
+            os: windows-latest
+            platform: win32
+            arch: x64
+          - label: Linux-x64
+            os: ubuntu-latest
+            platform: linux
+            arch: x64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install Linux native headers
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3 pkg-config libsecret-1-dev
+
+      - name: Install dependencies & compile native node-pty for host OS
+        run: npm ci
+
+      - name: Run unit & security gate test suite on ${{ matrix.label }}
+        run: npm test
+
+      - name: Package native Marlowe desktop bundle
+        run: |
+          npm run build
+          node scripts/package.mjs --platform=${{ matrix.platform }} --arch=${{ matrix.arch }}
+
+      - name: Upload ${{ matrix.label }} bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Marlowe-${{ matrix.label }}
+          path: release/Marlowe-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 30

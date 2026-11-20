@@ -3,7 +3,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 
-const DEFAULT_PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+const DEFAULT_PATH = '/opt/homebrew/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/snap/bin';
 const SHELLS = new Set(['zsh', 'bash', 'fish']);
 // Keep only real absolute directories outside the workspace. A directory the
 // agent can write to without review must not decide what an approved command
