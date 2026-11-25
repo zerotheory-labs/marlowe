@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "marlowe": {
+      "command": "npx",
+      "args": [
+        "--yes",
+        "github:zerotheory-labs/marlowe-ci",
+        "mcp"
+      ]
+    }
+  }
+}
