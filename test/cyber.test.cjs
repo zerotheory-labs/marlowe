@@ -598,3 +598,37 @@ test('Shirudo integration enforces operator gate on drafts, blocks signing keys,
   assert.equal(beefileAsset.kind, 'upatch');
   assert.ok(beefileAsset.engineIds.includes('shirudo'));
 }));
+
+test('cross-file reachability maps 1-hop HTTP route to helper SQLi while isolating unimported helpers', () => fixture(async f => {
+  await fs.mkdir(path.join(f.root, 'src', 'routes'), { recursive: true });
+  await fs.mkdir(path.join(f.root, 'src', 'db'), { recursive: true });
+  await fs.writeFile(
+    path.join(f.root, 'src', 'routes', 'users.js'),
+    "import { fetchUser } from '../db/queries.js';\nexport async function getUser(req, res) {\n  return fetchUser(req.query.id);\n}\n"
+  );
+  const sqli = 'SEL' + 'ECT * FROM users WHERE id = ' + "'${id}'";
+  const domSink = 'el.' + 'innerHTML = raw;';
+  await fs.writeFile(
+    path.join(f.root, 'src', 'db', 'queries.js'),
+    `export function fetchUser(id) {\n  return db.query(\`${sqli}\`);\n}\nexport function isolatedHelper(el, raw) {\n  ${domSink}\n}\n`
+  );
+
+  const graphs = await buildWorkspaceGraphs(f.root, {
+    findings: [
+      { id: 'f-1hop', title: 'SQL Injection', severity: 'high', status: 'open', category: 'appsec', cwe: 'CWE-89', location: 'src/db/queries.js:2', evidence: 'db.query' },
+      { id: 'f-iso', title: 'DOM Sink', severity: 'medium', status: 'open', category: 'appsec', cwe: 'CWE-79', location: 'src/db/queries.js:5', evidence: 'innerHTML' }
+    ],
+    tools: [],
+    scope: { targets: [] }
+  });
+
+  const reachableLane = graphs.reachability.lanes.find(l => l.finding?.id === 'f-1hop');
+  assert.ok(reachableLane);
+  assert.equal(reachableLane.state, 'reachable');
+  assert.match(reachableLane.entry.label, /^Cross-file HTTP \/ Socket Input/);
+  assert.match(reachableLane.entry.sub, /src\/routes\/users\.js/);
+
+  const isolatedLane = graphs.reachability.lanes.find(l => l.finding?.id === 'f-iso');
+  assert.ok(isolatedLane);
+  assert.equal(isolatedLane.state, 'unverified');
+}));

@@ -7,7 +7,7 @@ const { pathToFileURL } = require('node:url');
 const { _electron: electron, chromium } = require('@playwright/test');
 const { createFindingsStore } = require('../electron/findings.cjs');
 
-const WEB_DIR = process.env.MARLOWE_WEB_DIR || path.resolve(__dirname, '../../ZeroTheoryLabs/web/lab');
+const WEB_DIR = process.env.MARLOWE_WEB_DIR || path.resolve(__dirname, '../../ZeroTheoryLabs/web/public');
 const ASSETS_DIR = path.join(WEB_DIR, 'assets');
 const MARLOWE_HTML = path.join(WEB_DIR, 'marlowe.html');
 const APP_ROOT = path.resolve(__dirname, '..');
@@ -163,8 +163,8 @@ async function applicationSize(app, w, h) {
 }
 
 async function recordAppDemo() {
-  console.log('1/2 Recording full 6-chapter Marlowe v0.4 desktop app demo...');
-  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'marlowe-demo-v04-'));
+  console.log('1/2 Recording full 6-chapter Marlowe v0.6 desktop app demo...');
+  const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), 'marlowe-demo-v06-'));
   const demoRepoParent = path.join(dataDir, 'projects');
   const demoRepo = path.join(demoRepoParent, 'aegis-payments');
   await fs.mkdir(path.join(demoRepo, 'src'), { recursive: true });
@@ -172,6 +172,7 @@ async function recordAppDemo() {
   await fs.mkdir(path.join(demoRepo, 'infra'), { recursive: true });
   await fs.mkdir(path.join(demoRepo, 'captures'), { recursive: true });
   await fs.mkdir(path.join(demoRepo, 'bin'), { recursive: true });
+  await fs.mkdir(path.join(demoRepo, 'shirudo-shields'), { recursive: true });
 
   const fakePat = 'ghp_' + 'LiveDemoSecretTokenForMarloweShowcase99';
   // File 1: src/ledger.js (will be remediated via Approve once -> auto-mitigated!)
@@ -236,11 +237,57 @@ async function recordAppDemo() {
     req.on('end', () => {
       const payload = JSON.parse(body);
       const latestUser = payload.messages.findLastIndex(m => m.role === 'user');
+      const latestPrompt = String(payload.messages[latestUser]?.content || '');
       const toolResults = payload.messages.slice(latestUser + 1).filter(m => m.role === 'tool');
       let toolCalls = null;
       let finalText = '';
 
-      if (toolResults.length === 0) {
+      if (/shirudo/i.test(latestPrompt)) {
+        if (toolResults.length === 0) {
+          toolCalls = [call('write_file', {
+            path: 'shirudo-shields/Beefile',
+            content: [
+              '[package]',
+              'name = "webhook-sqli-shield"',
+              'description = "Temporary eBPF shield guarding verifyCharge"',
+              '',
+              '[[upatches]]',
+              'source = "verify_charge_guard.bpf.c"',
+              'type = "bpf"',
+              '',
+              '[upatches.tree]',
+              'id = "webhook-sqli-shield"',
+              '',
+              '[upatches.tree.selector.labels]',
+              'service = ["aegis-payments"]',
+              ''
+            ].join('\n')
+          }, 0)];
+        } else if (toolResults.length === 1) {
+          toolCalls = [call('write_file', {
+            path: 'shirudo-shields/verify_charge_guard.bpf.c',
+            content: [
+              'char LICENSE[] SEC("license") = "Dual BSD/GPL";',
+              '',
+              'SEC("lsm/socket_connect")',
+              'int guard_verify_charge(void *ctx) {',
+              '  unsigned int pid = bpf_get_current_pid_tgid() >> 32;',
+              '  return pid ? 0 : 0;',
+              '}',
+              ''
+            ].join('\n')
+          }, 0)];
+        } else if (toolResults.length === 2) {
+          toolCalls = [call('audit_shirudo_upatch', { path: 'shirudo-shields' }, 0)];
+        } else {
+          finalText = [
+            '### Shirudo Draft Shield — `webhook-sqli-shield`',
+            '',
+            '- `shirudo-shields/Beefile` + `verify_charge_guard.bpf.c` drafted behind Marlowe\'s one-shot approval gate.',
+            '- **Audit Verdict:** `HOLDS UP` (`SEC("license")` Dual BSD/GPL · explicit label selector · `audit_shirudo_upatch` verified).'
+          ].join('\n');
+        }
+      } else if (toolResults.length === 0) {
         toolCalls = [
           call('scan_secrets', { path: '.' }, 0),
           call('read_file', { path: 'src/ledger.js' }, 1)
@@ -301,7 +348,7 @@ async function recordAppDemo() {
           '| `src/webhook.js` | **2 Open** | `CWE-798` masked secret + `CWE-89` reachable `req.body` SQLi |',
           '| `visuals/console.html` | **False Positive** | Static constant array — severed (`0` blast radius) |',
           '',
-          'Open **DNA**, **9-CLI Convergence**, or **Attack Reachability** to inspect full multi-engine posture.'
+          'Open **DNA**, **10-CLI Convergence**, or **Attack Reachability** (or click **Draft Shield**) to inspect multi-engine posture.'
         ].join('\n');
       }
 
@@ -381,39 +428,56 @@ async function recordAppDemo() {
     await page.locator('#stop-button').waitFor({ state: 'hidden', timeout: 8000 });
     await sleep(2400);
 
-    // CHAPTER 3: Codebase DNA (Shannon Byte Entropy × 9/9 Security CLIs)
+    // CHAPTER 3: Codebase DNA (Shannon Byte Entropy × 10 Security CLIs)
     chapterTimes.push(Math.floor(rec.elapsedSeconds()));
-    await setChapterBanner(page, '03 / 06', 'Codebase DNA · Shannon byte entropy (0–8 b/B) × 9/9 CLIs');
+    await setChapterBanner(page, '03 / 06', 'Codebase DNA · Shannon byte entropy (0–8 b/B) × 10 CLIs');
     await page.locator('#dna-button').click();
     await page.locator('#dna-svg .dna-dot-node').first().waitFor({ state: 'visible', timeout: 5000 });
-    await sleep(2000);
+    await sleep(1800);
     // Click high-entropy binary dot on DNA map to showcase live inspector transition!
     await page.locator('[data-dna-filter="artifacts"]').click();
-    await sleep(1400);
+    await sleep(1200);
     await page.locator('[data-dna-filter="all"]').click();
-    await sleep(1100);
-
-    // CHAPTER 4: 9-CLI Security Convergence (Main Stage Tab)
-    chapterTimes.push(Math.floor(rec.elapsedSeconds()));
-    await setChapterBanner(page, '04 / 06', '9-CLI Convergence · Semgrep, Trivy, Gitleaks, Nmap, Radare2 & otool');
-    await page.locator('#convergence-tab').click();
-    await page.locator('#convergence-stage .stage-svg-node').first().waitFor({ state: 'visible', timeout: 5000 });
-    await sleep(1800);
-    await page.locator('#convergence-stage .stage-svg-node').first().click();
-    await sleep(1600);
-    await page.locator('#convergence-stage .stage-svg-node').first().click();
     await sleep(900);
 
-    // CHAPTER 5: Attack Surface Reachability + ⌘J 100% Full-Width Mode
+    // CHAPTER 4: 10-CLI Security Convergence (Main Stage Tab)
     chapterTimes.push(Math.floor(rec.elapsedSeconds()));
-    await setChapterBanner(page, '05 / 06', 'Attack Reachability · Exploitable taint vs. severed false positives (⌘J)');
+    await setChapterBanner(page, '04 / 06', '10-CLI Convergence · Semgrep, Trivy, Gitleaks, Nmap, Radare2 & Shirudo');
+    await page.locator('#convergence-tab').click();
+    await page.locator('#convergence-stage .stage-svg-node').first().waitFor({ state: 'visible', timeout: 5000 });
+    await sleep(1700);
+    await page.locator('#convergence-stage .stage-svg-node').first().click();
+    await sleep(1400);
+    await page.locator('#convergence-stage .stage-svg-node').first().click();
+    await sleep(800);
+
+    // CHAPTER 5: Attack Surface Reachability (⌘J) + 1-Click Draft Shield → Shirudo Upatch Gate
+    chapterTimes.push(Math.floor(rec.elapsedSeconds()));
+    await setChapterBanner(page, '05 / 06', 'Attack Reachability · Cross-file taint & 1-click Draft Shield (⌘J)');
     await page.locator('#reachability-tab').click();
     await page.locator('#reachability-stage .stage-svg-node').first().waitFor({ state: 'visible', timeout: 5000 });
-    await sleep(2000);
+    await sleep(1600);
+    await page.locator('#reachability-stage .stage-svg-node').first().click();
+    await sleep(1000);
     await page.locator('#toggle-drawer').click(); // Expand graph to 100% full window width!
-    await sleep(2100);
+    await sleep(1700);
     await page.locator('#toggle-drawer').click(); // Restore split pane
+    await sleep(500);
+    const draftShieldBtn = page.getByRole('button', { name: 'Draft Shield', exact: true });
+    await draftShieldBtn.waitFor({ state: 'visible', timeout: 4000 });
+    await draftShieldBtn.click();
     await sleep(700);
+    await page.locator('#send-button').click();
+    const shieldGate1 = page.locator('.action-card[data-status="awaiting-approval"]').last();
+    await shieldGate1.waitFor({ state: 'visible', timeout: 8000 });
+    await sleep(1500);
+    await shieldGate1.getByRole('button', { name: 'Approve once', exact: true }).click();
+    const shieldGate2 = page.locator('.action-card[data-status="awaiting-approval"]').last();
+    await shieldGate2.waitFor({ state: 'visible', timeout: 8000 });
+    await sleep(1300);
+    await shieldGate2.getByRole('button', { name: 'Approve once', exact: true }).click();
+    await page.locator('#stop-button').waitFor({ state: 'hidden', timeout: 8000 });
+    await sleep(1500);
 
     // CHAPTER 6: Dynamic Local + Frontier Model Radar & Inline Secret Masking
     chapterTimes.push(Math.floor(rec.elapsedSeconds()));

@@ -7,6 +7,23 @@ const arg = name => {
 
 const platform = arg('platform');
 const arch = arg('arch');
+const signIdentity = (process.env.APPLE_SIGN_IDENTITY || '').trim();
+const appleId = (process.env.APPLE_ID || '').trim();
+const appleAppPassword = (process.env.APPLE_APP_SPECIFIC_PASSWORD || '').trim();
+const appleTeamId = (process.env.APPLE_TEAM_ID || '').trim();
+const isDarwin = (platform || process.platform) === 'darwin';
+
+let osxSign;
+let osxNotarize;
+if (isDarwin && signIdentity) {
+  osxSign = { identity: signIdentity, hardenedRuntime: true };
+  if (appleId && appleAppPassword && appleTeamId) {
+    osxNotarize = { appleId, appleIdPassword: appleAppPassword, teamId: appleTeamId };
+  }
+  console.log(`[package] macOS code signing enabled (${osxNotarize ? 'signed + notarized' : 'signed only'}).`);
+} else if (isDarwin) {
+  console.log('[package] macOS code signing skipped (APPLE_SIGN_IDENTITY not set — producing unsigned bundle).');
+}
 
 const paths = await packager({
   dir: '.',
@@ -15,6 +32,8 @@ const paths = await packager({
   overwrite: true,
   ...(platform ? { platform } : {}),
   ...(arch ? { arch } : {}),
+  ...(osxSign ? { osxSign } : {}),
+  ...(osxNotarize ? { osxNotarize } : {}),
   asar: { unpack: '**/node-pty/**' },
   appBundleId: 'com.zerotheorylabs.marlowe',
   appCategoryType: 'public.app-category.developer-tools',

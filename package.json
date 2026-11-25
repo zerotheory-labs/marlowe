@@ -1,7 +1,7 @@
 {
   "name": "marlowe-terminal",
   "productName": "Marlowe",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Marlowe. — Security for AI. Desktop terminal & cybersecurity workbench by Zero Theory Labs.",
   "main": "electron/main.cjs",
   "homepage": "https://github.com/zerotheory-labs/marlowe",

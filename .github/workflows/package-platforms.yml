@@ -7,7 +7,7 @@ on:
       - "v*"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   package:
@@ -50,13 +50,41 @@ jobs:
         run: npm test
 
       - name: Package native Marlowe desktop bundle
+        env:
+          APPLE_SIGN_IDENTITY: ${{ secrets.APPLE_SIGN_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           npm run build
           node scripts/package.mjs --platform=${{ matrix.platform }} --arch=${{ matrix.arch }}
+
+      - name: Archive & checksum (${{ matrix.label }})
+        shell: bash
+        run: |
+          mkdir -p dist-assets
+          BUNDLE_DIR="Marlowe-${{ matrix.platform }}-${{ matrix.arch }}"
+          ARCHIVE_BASE="Marlowe-${{ matrix.label }}-${{ github.ref_name }}"
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            ditto -c -k --sequesterRsrc --keepParent "release/${BUNDLE_DIR}/Marlowe.app" "dist-assets/${ARCHIVE_BASE}.zip"
+          elif [ "${{ runner.os }}" = "Windows" ]; then
+            pwsh -NoProfile -Command "Compress-Archive -Path 'release/${BUNDLE_DIR}/*' -DestinationPath 'dist-assets/${ARCHIVE_BASE}.zip' -Force"
+          else
+            tar -C release -czf "dist-assets/${ARCHIVE_BASE}.tar.gz" "${BUNDLE_DIR}"
+          fi
+          (cd dist-assets && sha256sum * > "SHA256SUMS-${{ matrix.label }}.txt" 2>/dev/null || shasum -a 256 * > "SHA256SUMS-${{ matrix.label }}.txt")
+          ls -lh dist-assets
 
       - name: Upload ${{ matrix.label }} bundle artifact
         uses: actions/upload-artifact@v4
         with:
           name: Marlowe-${{ matrix.label }}
-          path: release/Marlowe-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist-assets/*
           retention-days: 30
+
+      - name: Attach bundle & checksum to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" dist-assets/* --repo "${{ github.repository }}" --clobber

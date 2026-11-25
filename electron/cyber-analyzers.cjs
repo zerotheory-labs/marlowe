@@ -996,11 +996,242 @@ async function scanWorkspaceDna(root, { findings = [], tools = [], maxFiles = 26
   };
 }
 
-async function inspectSourceReachability(root, relPath, lineNum) {
+const REACH_SOURCE_EXT_RE = /\.(?:[cm]?[jt]sx?|py|go)$/i;
+const REACH_SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', 'vendor', 'coverage', '.next', 'release', 'playwright-report', 'test-results']);
+const REACH_TEST_FILE_RE = /(?:^|\/)(?:test|tests|__tests__)\/|(?:\.(?:test|spec)\.[cm]?[jt]sx?|_test\.(?:go|py)|test_[^/]+\.py)$/i;
+const REACH_PROTECTED_RE = /^\.(?:env(?:\.|$)|ssh$|aws$|gnupg$|npmrc$|netrc$|shirudo$|marlowe)|shirudo-keys/i;
+
+function detectExternalIngress(text) {
+  if (/\b(?:req\.(?:body|query|params|headers|cookies)|request\.(?:json|args|form)|axum::|hyper::|actix_web|TcpListener|UdpSocket|http\.createServer)\b/.test(text)) {
+    return { entryKind: 'HTTP / Socket Input', entrySub: 'Network ingress in module' };
+  }
+  if (/\b(?:location\.(?:search|hash|href)|URLSearchParams|addEventListener\s*\(\s*['"]message['"]|postMessage|WebSocket)\b/.test(text)) {
+    return { entryKind: 'URL / DOM Message', entrySub: 'Client untrusted source' };
+  }
+  if (/\b(?:process\.argv|std::env::args|sys\.argv|io::stdin)\b/.test(text)) {
+    return { entryKind: 'CLI / Stdin Input', entrySub: 'Command-line source' };
+  }
+  return null;
+}
+
+function extractEnclosingFnName(lines, targetIdx, fallback) {
+  for (let i = targetIdx; i >= Math.max(0, targetIdx - 55); i--) {
+    const l = lines[i] || '';
+    const m = /\b(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(|\bfn\s+([A-Za-z_]\w*)\s*[<(]|\bdef\s+([A-Za-z_]\w*)\s*\(|\bfunc\s+(?:\([^)]+\)\s*)?([A-Za-z_]\w*)\s*\(|\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/.exec(l);
+    if (m) return `${m[1] || m[2] || m[3] || m[4] || m[5]}()`;
+  }
+  return fallback;
+}
+
+function moduleExportsSymbols(relPath, text) {
+  if (/\.py$/i.test(relPath)) return /^def\s+[A-Za-z_]\w*\s*\(/m.test(text);
+  if (/\.go$/i.test(relPath)) return /^func\s+[A-Z]\w*\s*\(/m.test(text);
+  return /\bexport\b|\bmodule\.exports\b|\bexports\.[A-Za-z_$]/.test(text);
+}
+
+function parseNamedList(raw) {
+  return String(raw || '')
+    .split(',')
+    .map(part => part.trim().split(/\s+(?:as\s+|:\s*)/)[0].trim())
+    .filter(s => /^[A-Za-z_$][\w$]*$/.test(s));
+}
+
+function parseSourceImports(relPath, text) {
+  const imports = [];
+  let m;
+  const esmNamedRe = /^\s*import\s+(?:type\s+)?(?:\{([^}]+)\}|([A-Za-z_$][\w$]*)\s*,\s*\{([^}]+)\}|([A-Za-z_$][\w$]*|\*\s+as\s+[A-Za-z_$][\w$]*))\s+from\s+['"]([^'"]+)['"]/gm;
+  while ((m = esmNamedRe.exec(text))) {
+    const named = m[1] ? parseNamedList(m[1]) : m[3] ? parseNamedList(m[3]) : [];
+    const exclusive = Boolean(m[1] && !m[2]);
+    imports.push({ spec: m[5], named, exclusive });
+  }
+  const esmSideRe = /^\s*import\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/gm;
+  while ((m = esmSideRe.exec(text))) {
+    imports.push({ spec: m[1] || m[2], named: [], exclusive: false });
+  }
+  const cjsDestructRe = /(?:const|let|var)\s+\{([^}]+)\}\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/g;
+  while ((m = cjsDestructRe.exec(text))) {
+    imports.push({ spec: m[2], named: parseNamedList(m[1]), exclusive: true });
+  }
+  const cjsPlainRe = /(?:(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*=\s*)?require\(\s*['"]([^'"]+)['"]\s*\)/g;
+  while ((m = cjsPlainRe.exec(text))) {
+    const spec = m[1];
+    if (!imports.some(existing => existing.spec === spec)) {
+      imports.push({ spec, named: [], exclusive: false });
+    }
+  }
+  if (/\.py$/i.test(relPath)) {
+    const pyFromRe = /^\s*from\s+(\.{0,2}[A-Za-z0-9_.]+)\s+import\s+([^\n#]+)/gm;
+    while ((m = pyFromRe.exec(text))) {
+      const names = m[2].includes('*') ? [] : parseNamedList(m[2]);
+      imports.push({ spec: m[1], named: names, exclusive: Boolean(names.length), pythonMod: true });
+    }
+  }
+  return imports;
+}
+
+function resolveModuleImport(callerRel, imp, indexedSet) {
+  const pathMod = require('node:path');
+  const spec = String(imp.spec || '').trim();
+  if (!spec) return null;
+  if (imp.pythonMod) {
+    const dotted = spec.replace(/^\.+/, '').replace(/\./g, '/');
+    const candidates = [`${dotted}.py`, `${dotted}/__init__.py`];
+    for (const c of candidates) {
+      if (indexedSet.has(c)) return c;
+    }
+    for (const rel of indexedSet) {
+      if (rel.endsWith('/' + dotted + '.py')) return rel;
+    }
+    return null;
+  }
+  if (!spec.startsWith('./') && !spec.startsWith('../')) return null;
+  const callerDir = pathMod.posix.dirname(callerRel);
+  const raw = pathMod.posix.normalize(pathMod.posix.join(callerDir, spec));
+  if (raw.startsWith('..')) return null;
+  const exts = ['.js', '.cjs', '.mjs', '.ts', '.tsx', '.jsx', '.py', '.go'];
+  const candidates = [raw, ...exts.map(e => raw + e), ...exts.map(e => `${raw}/index${e}`)];
+  return candidates.find(c => indexedSet.has(c)) || null;
+}
+
+async function buildCrossFileIndex(rootResolved) {
+  const pathMod = require('node:path');
+  const files = new Map();
+  const queue = [rootResolved];
+  const maxFiles = 250;
+
+  while (queue.length && files.size < maxFiles) {
+    const dir = queue.shift();
+    let entries;
+    try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { continue; }
+    entries.sort((a, b) => a.name.localeCompare(b.name));
+    const subdirs = [];
+    for (const entry of entries) {
+      if (entry.isSymbolicLink() || REACH_PROTECTED_RE.test(entry.name)) continue;
+      if (entry.isDirectory()) {
+        if (!REACH_SKIP_DIRS.has(entry.name)) subdirs.push(pathMod.join(dir, entry.name));
+        continue;
+      }
+      if (!entry.isFile() || !REACH_SOURCE_EXT_RE.test(entry.name)) continue;
+      const full = pathMod.join(dir, entry.name);
+      const rel = pathMod.relative(rootResolved, full).split(pathMod.sep).join('/');
+      if (REACH_TEST_FILE_RE.test(rel)) continue;
+      let handle;
+      try {
+        handle = await fs.open(full, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
+        const stat = await handle.stat();
+        if (!stat.isFile() || stat.nlink > 1 || stat.size > 512 * 1024) continue;
+        const buf = Buffer.alloc(stat.size);
+        if (stat.size > 0) await handle.read(buf, 0, stat.size, 0);
+        if (buf.subarray(0, Math.min(stat.size, 4096)).includes(0)) continue;
+        const text = buf.toString('utf8');
+        files.set(rel, {
+          relPath: rel,
+          text,
+          ingress: detectExternalIngress(text),
+          rawImports: parseSourceImports(rel, text),
+          resolvedImports: []
+        });
+        if (files.size >= maxFiles) break;
+      } catch {
+        // Ignore unreadable source files cleanly
+      } finally {
+        await handle?.close().catch(() => {});
+      }
+    }
+    queue.push(...subdirs);
+  }
+
+  const indexedSet = new Set(files.keys());
+  for (const entry of files.values()) {
+    entry.resolvedImports = entry.rawImports
+      .map(imp => ({ ...imp, target: resolveModuleImport(entry.relPath, imp, indexedSet) }))
+      .filter(imp => Boolean(imp.target));
+  }
+  return files;
+}
+
+function findCallerFunctionsForSymbol(text, calleeSymbol) {
+  if (!calleeSymbol) return [];
+  const escaped = calleeSymbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const callRe = new RegExp(`\\b${escaped}\\b`, 'g');
+  const lines = text.split('\n');
+  const fns = new Set();
+  let match;
+  while ((match = callRe.exec(text))) {
+    const lineIdx = text.slice(0, match.index).split('\n').length - 1;
+    const lineText = lines[lineIdx] || '';
+    if (/^\s*(?:import\b|from\b|(?:const|let|var)\s+\{[^}]*\}\s*=\s*require)/.test(lineText)) continue;
+    const fn = extractEnclosingFnName(lines, lineIdx, '');
+    if (fn) fns.add(fn.replace(/\(\)$/, ''));
+  }
+  return [...fns];
+}
+
+function callerMatchesTarget(caller, targetRelPath, symbolBases) {
+  const pathMod = require('node:path');
+  const targetBase = pathMod.posix.basename(targetRelPath);
+  const symbolSet = new Set((Array.isArray(symbolBases) ? symbolBases : [symbolBases]).filter(Boolean));
+  return caller.resolvedImports.some(imp => {
+    if (imp.target !== targetRelPath) return false;
+    if (!imp.exclusive || symbolSet.has(targetBase) || symbolSet.size === 0) return true;
+    for (const sym of symbolSet) {
+      if (imp.named.includes(sym) && new RegExp(`\\b${sym.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(caller.text)) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+async function traceCrossFileReachability(rootResolved, targetRelPath, targetText, fnName, options = {}) {
+  const pathMod = require('node:path');
+  const cache = options.cache instanceof Map ? options.cache : null;
+  let index = cache?.get(rootResolved);
+  if (!index) {
+    index = await buildCrossFileIndex(rootResolved);
+    if (cache) cache.set(rootResolved, index);
+  }
+  const normTarget = String(targetRelPath || '').replace(/^\.\//, '').split(pathMod.sep).join('/');
+  const fnBase = String(fnName || '').replace(/\(\)$/, '');
+  const hop1 = [];
+
+  for (const caller of index.values()) {
+    if (caller.relPath === normTarget) continue;
+    if (!callerMatchesTarget(caller, normTarget, [fnBase])) continue;
+    if (caller.ingress) {
+      return {
+        entryKind: `Cross-file ${caller.ingress.entryKind}`,
+        entrySub: `Imported by ${caller.relPath} (hop 1)`,
+        hops: 1,
+        via: [caller.relPath]
+      };
+    }
+    hop1.push(caller);
+  }
+
+  for (const mid of hop1) {
+    const midSymbols = findCallerFunctionsForSymbol(mid.text, fnBase);
+    for (const outer of index.values()) {
+      if (outer.relPath === normTarget || outer.relPath === mid.relPath || !outer.ingress) continue;
+      if (callerMatchesTarget(outer, mid.relPath, midSymbols.length ? midSymbols : [fnBase])) {
+        return {
+          entryKind: `Cross-file ${outer.ingress.entryKind}`,
+          entrySub: `Imported via ${outer.relPath} → ${mid.relPath} (hop 2)`,
+          hops: 2,
+          via: [outer.relPath, mid.relPath]
+        };
+      }
+    }
+  }
+  return null;
+}
+
+async function inspectSourceReachability(root, relPath, lineNum, options = {}) {
   const pathMod = require('node:path');
   let handle;
   try {
-    const rootResolved = pathMod.resolve(root);
+    const rootResolved = await fs.realpath(pathMod.resolve(root)).catch(() => pathMod.resolve(root));
     const full = pathMod.resolve(rootResolved, relPath);
     if (full !== rootResolved && !full.startsWith(rootResolved + pathMod.sep)) return null;
     handle = await fs.open(full, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
@@ -1012,32 +1243,23 @@ async function inspectSourceReachability(root, relPath, lineNum) {
     const text = buf.toString('utf8');
     const lines = text.split('\n');
 
-    let entryKind = null;
-    let entrySub = 'Static / internal state only';
-    if (/\b(?:req\.(?:body|query|params|headers|cookies)|request\.(?:json|args|form)|axum::|hyper::|actix_web|TcpListener|UdpSocket|http\.createServer)\b/.test(text)) {
-      entryKind = 'HTTP / Socket Input';
-      entrySub = 'Network ingress in module';
-    } else if (/\b(?:location\.(?:search|hash|href)|URLSearchParams|addEventListener\s*\(\s*['"]message['"]|postMessage|WebSocket)\b/.test(text)) {
-      entryKind = 'URL / DOM Message';
-      entrySub = 'Client untrusted source';
-    } else if (/\b(?:process\.argv|std::env::args|sys\.argv|io::stdin)\b/.test(text)) {
-      entryKind = 'CLI / Stdin Input';
-      entrySub = 'Command-line source';
+    const localIngress = detectExternalIngress(text);
+    const fnName = extractEnclosingFnName(lines, Math.max(0, Math.min(lines.length - 1, (lineNum || 1) - 1)), pathMod.basename(relPath));
+    const rawLine = (lines[Math.max(0, Math.min(lines.length - 1, (lineNum || 1) - 1))] || '').trim();
+    const sinkSnippet = rawLine ? redactSecrets(rawLine.slice(0, 140)).text : '';
+
+    if (localIngress) {
+      return { binary: false, entryKind: localIngress.entryKind, entrySub: localIngress.entrySub, fnName, sinkSnippet, hops: 0, via: [] };
     }
 
-    let fnName = pathMod.basename(relPath);
-    const targetIdx = Math.max(0, Math.min(lines.length - 1, (lineNum || 1) - 1));
-    for (let i = targetIdx; i >= Math.max(0, targetIdx - 55); i--) {
-      const l = lines[i];
-      const m = /\b(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(|\bfn\s+([A-Za-z_]\w*)\s*[<(]|\bdef\s+([A-Za-z_]\w*)\s*\(|\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:async\s*)?(?:\([^)]*\)|[A-Za-z_$][\w$]*)\s*=>/.exec(l);
-      if (m) {
-        fnName = `${m[1] || m[2] || m[3] || m[4]}()`;
-        break;
+    if (options.crossFile !== false && moduleExportsSymbols(relPath, text)) {
+      const cross = await traceCrossFileReachability(rootResolved, relPath, text, fnName, options);
+      if (cross) {
+        return { binary: false, entryKind: cross.entryKind, entrySub: cross.entrySub, fnName, sinkSnippet, hops: cross.hops, via: cross.via };
       }
     }
-    const rawLine = (lines[targetIdx] || '').trim();
-    const sinkSnippet = rawLine ? redactSecrets(rawLine.slice(0, 140)).text : '';
-    return { binary: false, entryKind, entrySub, fnName, sinkSnippet };
+
+    return { binary: false, entryKind: null, entrySub: 'Static / internal state only', fnName, sinkSnippet, hops: 0, via: [] };
   } catch {
     return null;
   } finally {
@@ -1249,10 +1471,11 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
     }
   }
 
+  const reachCache = new Map();
   for (const g of [...groupedActive.values()].slice(0, 4)) {
     const f = g.finding;
     const ctx = root && f.category !== 'network' && f.category !== 'web'
-      ? await inspectSourceReachability(root, g.filePath, g.lineNum)
+      ? await inspectSourceReachability(root, g.filePath, g.lineNum, { cache: reachCache })
       : null;
     const hasExternalEntry = Boolean(ctx?.entryKind) || f.category === 'secrets' || f.category === 'supply-chain' || f.category === 'network' || f.category === 'web';
     const baseFile = pathMod.basename(g.filePath);
@@ -1280,7 +1503,9 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
         sub: hasExternalEntry ? (f.cvss ? `CVSS ${f.cvss} · Fix ready` : 'Actionable · Draft Fix') : 'Verify or Dismiss FP'
       },
       detail: hasExternalEntry
-        ? `[REACHABLE · ${f.severity.toUpperCase()}] ${f.title} at ${f.location} — untrusted entry surface present in module.`
+        ? (ctx?.hops > 0 && ctx.via?.length
+          ? `[REACHABLE (${ctx.hops}-HOP) · ${f.severity.toUpperCase()}] ${f.title} at ${f.location} — untrusted input reaches sink via ${ctx.via.join(' → ')}.`
+          : `[REACHABLE · ${f.severity.toUpperCase()}] ${f.title} at ${f.location} — untrusted entry surface present in module.`)
         : `[UNVERIFIED LOCAL SINK · ${f.severity.toUpperCase()}] ${f.title} at ${f.location} — no external HTTP/URL/CLI input detected in ${baseFile}; inspect or mark false-positive.`
     });
   }
@@ -1380,6 +1605,9 @@ module.exports = {
   extractIocs,
   analyzeLogs,
   scanWorkspaceDna,
+  detectExternalIngress,
+  inspectSourceReachability,
+  traceCrossFileReachability,
   reconcileWorkspaceFindings,
   buildWorkspaceGraphs
 };
