@@ -15,12 +15,13 @@ const {
 } = require('./cyber-analyzers.cjs');
 const { prepareScannerSpec, executeScannerRun } = require('./cyber-toolchain.cjs');
 const { normalizeFinding } = require('./findings.cjs');
+const { isShirudoDraftPath, inspectShirudoTarget, verifyShirudoAttestation } = require('./shirudo.cjs');
 
 const MAX_FILE = 200000;
 // Read and search results stay well under the 32 KB model-visible cap, so the
 // model pages or narrows a request instead of receiving a silently cut result.
 const RESULT_BUDGET = 24000;
-const PROTECTED = /^(\.git|\.ssh|\.aws|\.gnupg|\.codex|\.npmrc|\.netrc|\.pypirc|\.env(?:\..*)?|.*\.(?:pem|key))$/i;
+const PROTECTED = /^(\.git|\.ssh|\.aws|\.gnupg|\.codex|\.shirudo|shirudo-keys|\.npmrc|\.netrc|\.pypirc|\.env(?:\..*)?|.*\.(?:pem|key))$/i;
 const SKIPPED = new Set([
   'node_modules', '.venv', 'venv', '__pycache__',
   '.uv-cache', '.cache', '.pytest_cache', '.mypy_cache', '.ruff_cache',
@@ -69,7 +70,9 @@ const CYBER_TOOLS = [
   schema('triage_artifact', 'Forensic static triage of a workspace file or binary (up to 10 MB): computes SHA-256/SHA-1/MD5 hashes, byte Shannon entropy (packing/encryption indicator), ELF/Mach-O/PE/PDF/PCAP header metadata, and notable printable strings.', { path: str('Workspace-relative file path') }, ['path']),
   schema('extract_iocs', 'Extract and classify Indicators of Compromise (public/private IPs, domains, URLs, SHA-256/SHA-1/MD5 hashes, CVEs, and MITRE ATT&CK technique IDs) from a workspace file or log.', { path: str('Workspace-relative file path') }, ['path']),
   schema('analyze_logs', 'Analyze JSONL, HTTP access, or syslog/auth log files (up to 10 MB) for brute-force spikes, traversal/SQLi/XSS/JNDI/SSRF probes, scanner signatures, and top source IPs.', { path: str('Workspace-relative log file path'), filter: str('Optional case-insensitive substring filter') }, ['path']),
-  schema('run_security_scanner', 'Execute an installed external security CLI (semgrep, trivy, gitleaks, osv-scanner, nmap, or nuclei) using safe preset arguments without shell interpolation. Always requires user approval.', { scanner: str('Scanner ID: semgrep, trivy, gitleaks, osv-scanner, nmap, or nuclei'), target: str('Workspace-relative path for local scanners, or Authorized Scope host/URL for nmap/nuclei'), profile: str('Optional preset profile (e.g. auto, owasp-top-ten, secrets, fs-vuln, fs-misconfig, fs-all, dir-no-git, workspace, top-100-ports, service-version, misconfiguration, exposures, cves-safe)'), timeout_seconds: int('Optional time limit in seconds, from 10 to 600 (default 120)') }, ['scanner', 'target']),
+  schema('audit_shirudo_upatch', 'Audit Shirudo Beefiles, Plain BPF C (.bpf.c/.upatch.c) runtime upatches, and .bee/.upatch bundles for embedded keys, insecure registries, path traversal, unsafe BPF helpers, and wildcard selectors.', { path: str('Workspace-relative path to a Beefile, .bpf.c file, .bee package, or directory (e.g. ".")') }, ['path']),
+  schema('verify_shirudo_attestation', 'Inspect a Shirudo TPM 2.0 attestation evidence JSON file in the workspace and verify it offline via trusted shirudo CLI when installed.', { evidence_path: str('Workspace-relative path to the Shirudo TPM 2.0 attestation evidence JSON file'), nonce: str('Optional expected hex nonce (8-128 hex chars)'), ak_name: str('Optional expected attestation key (AK) name') }, ['evidence_path']),
+  schema('run_security_scanner', 'Execute an installed external security CLI (semgrep, trivy, gitleaks, osv-scanner, nmap, nuclei, or shirudo) using safe preset arguments without shell interpolation. Always requires user approval.', { scanner: str('Scanner ID: semgrep, trivy, gitleaks, osv-scanner, nmap, nuclei, or shirudo'), target: str('Workspace-relative path for local scanners, Authorized Scope host/URL for nmap/nuclei, or "." / upatch path for shirudo'), profile: str('Optional preset profile (e.g. auto, owasp-top-ten, secrets, fs-vuln, fs-misconfig, fs-all, dir-no-git, workspace, top-100-ports, service-version, misconfiguration, exposures, cves-safe, status, upatch-list, upatch-info)'), timeout_seconds: int('Optional time limit in seconds, from 10 to 600 (default 120)') }, ['scanner', 'target']),
   schema('record_finding', 'Record a single verified security vulnerability, misconfiguration, or incident finding into the workspace Findings Ledger (for UI review and SARIF/Markdown export). Only record findings where untrusted input or real secret/CVE exposure is verified.', FINDING_PROPERTIES, FINDING_REQUIRED),
   schema('record_findings', 'Record multiple verified security findings into the workspace Findings Ledger in a single step (up to 50 findings per call). Never record unverified sink candidates or static UI constants.', { findings: { type: 'array', description: 'Non-empty array of verified findings (1 to 50 items)', items: { type: 'object', properties: FINDING_PROPERTIES, required: FINDING_REQUIRED, additionalProperties: false } } }, ['findings']),
   schema('update_finding_status', 'Update an existing finding status in the workspace Findings Ledger (for example marking it mitigated after applying a code fix, or false-positive when inspection shows only static constants with no untrusted input).', { finding_id: str('UUID of the existing finding in the ledger'), status: str('New status: open, verified, mitigated, or false-positive') }, ['finding_id', 'status'])
@@ -77,9 +80,10 @@ const CYBER_TOOLS = [
 
 const TOOLS = [...CORE_TOOLS, ...CYBER_TOOLS];
 
-const APPSEC_CYBER_NAMES = new Set(['scan_secrets', 'audit_code_patterns', 'audit_dependencies', 'run_security_scanner', 'record_finding', 'record_findings', 'update_finding_status']);
+const APPSEC_CYBER_NAMES = new Set(['scan_secrets', 'audit_code_patterns', 'audit_dependencies', 'audit_shirudo_upatch', 'verify_shirudo_attestation', 'run_security_scanner', 'record_finding', 'record_findings', 'update_finding_status']);
 const RECON_CYBER_NAMES = new Set(['inspect_http_security', 'inspect_tls', 'dns_recon', 'probe_ports', 'run_security_scanner', 'scan_secrets', 'record_finding', 'record_findings', 'update_finding_status']);
-const DFIR_CYBER_NAMES = new Set(['triage_artifact', 'extract_iocs', 'analyze_logs', 'scan_secrets', 'audit_code_patterns', 'run_security_scanner', 'record_finding', 'record_findings', 'update_finding_status']);
+const DFIR_CYBER_NAMES = new Set(['triage_artifact', 'extract_iocs', 'analyze_logs', 'audit_shirudo_upatch', 'verify_shirudo_attestation', 'scan_secrets', 'audit_code_patterns', 'run_security_scanner', 'record_finding', 'record_findings', 'update_finding_status']);
+const UPATCH_CYBER_NAMES = new Set(['audit_shirudo_upatch', 'verify_shirudo_attestation', 'scan_secrets', 'audit_code_patterns', 'audit_dependencies', 'triage_artifact', 'run_security_scanner', 'record_finding', 'record_findings', 'update_finding_status']);
 
 const NETWORK_RECON_NAMES = new Set(['inspect_http_security', 'inspect_tls', 'dns_recon', 'probe_ports']);
 
@@ -88,6 +92,7 @@ function toolsForPlaybook(playbook = 'general', scope = null) {
   if (playbook === 'appsec') selected = [...CORE_TOOLS, ...CYBER_TOOLS.filter(t => APPSEC_CYBER_NAMES.has(t.function.name))];
   else if (playbook === 'recon') selected = [...CORE_TOOLS.filter(t => ['list_files', 'find_files', 'search_text', 'read_file', 'write_file'].includes(t.function.name)), ...CYBER_TOOLS.filter(t => RECON_CYBER_NAMES.has(t.function.name))];
   else if (playbook === 'dfir') selected = [...CORE_TOOLS, ...CYBER_TOOLS.filter(t => DFIR_CYBER_NAMES.has(t.function.name))];
+  else if (playbook === 'upatch') selected = [...CORE_TOOLS, ...CYBER_TOOLS.filter(t => UPATCH_CYBER_NAMES.has(t.function.name))];
   if (scope && (!Array.isArray(scope.targets) || scope.targets.length === 0)) {
     return selected.filter(t => !NETWORK_RECON_NAMES.has(t.function.name));
   }
@@ -443,6 +448,18 @@ async function prepareTool(root, name, args, options = {}) {
     const stat = await fs.lstat(file);
     return { name, args, file, isDirectory: stat.isDirectory(), title: args.path, reason: '' };
   }
+  if (name === 'audit_shirudo_upatch') {
+    const upathTarget = await resolvePath(root, args.path, { any: true });
+    return { name, args, file: upathTarget, title: args.path, reason: '' };
+  }
+  if (name === 'verify_shirudo_attestation') {
+    const cleanNonce = args.nonce ? String(args.nonce).trim() : '';
+    const cleanAk = args.ak_name ? String(args.ak_name).trim() : '';
+    if (cleanNonce && !/^[0-9a-fA-F]{8,128}$/.test(cleanNonce)) throw new Error('Invalid nonce: expected 8-128 hex characters.');
+    if (cleanAk && !/^[0-9a-zA-Z:._-]{4,128}$/.test(cleanAk)) throw new Error('Invalid ak_name: expected 4-128 alphanumeric, :, ., _, or - characters.');
+    const evFile = await resolvePath(root, args.evidence_path);
+    return { name, args: { ...args, nonce: cleanNonce, ak_name: cleanAk }, file: evFile, title: args.evidence_path, reason: '' };
+  }
   const file = await resolvePath(root, args.path, { directory: DIRECTORY_TOOLS.has(name), missing: name === 'write_file' });
   if (name === 'scan_secrets') return { name, args, file, title: `secrets in ${args.path}`, reason: '' };
   if (name === 'audit_code_patterns') {
@@ -471,12 +488,15 @@ async function prepareTool(root, name, args, options = {}) {
     after = before.replace(args.old_text, () => args.new_text);
     if (args.new_text.length < args.old_text.length || !args.new_text.trim() || args.old_text.split('\n').length > 100 || (args.old_text === before && !args.new_text.includes(args.old_text))) reason = 'This edit removes text or replaces a large section.';
   }
+  if (!reason && (name === 'write_file' || name === 'edit_file') && isShirudoDraftPath(args.path)) {
+    reason = 'Creating or modifying a Shirudo Beefile or kernel/runtime upatch requires explicit operator review before building or signing.';
+  }
   if (after !== null && Buffer.byteLength(after) > MAX_FILE) throw new Error('Edited file exceeds 200 KB.');
   return { name, args, file, before, after, reason, title: args.path, diff: lineDiff(before, after), preview: `--- Before: ${args.path}\n${before ?? '(new file)'}\n\n+++ After: ${args.path}\n${after ?? '(deleted)'}` };
 }
 
 async function executeTool(root, plan, context = {}) {
-  const { signal, backupDir, onOutput, commandPath, scope = DEFAULT_SCOPE, findingsStore, onFinding, playbook, runId, fetchImpl, dnsLookup, dnsResolver, tlsConnect, netConnect, spawnImpl } = context;
+  const { signal, backupDir, onOutput, commandPath, scope = DEFAULT_SCOPE, findingsStore, onFinding, playbook, runId, fetchImpl, dnsLookup, dnsResolver, tlsConnect, netConnect, spawnImpl, execFileImpl } = context;
   signal.throwIfAborted();
   if (plan.name === 'run_command') {
     await resolvePath(root, plan.args.cwd, { directory: true });
@@ -549,6 +569,19 @@ async function executeTool(root, plan, context = {}) {
       status: plan.args.status,
       summary: `Updated finding ${plan.args.finding_id.slice(0, 8)}… status to "${plan.args.status}".`
     };
+  }
+  if (plan.name === 'audit_shirudo_upatch') {
+    return inspectShirudoTarget(root, plan.args.path, signal);
+  }
+  if (plan.name === 'verify_shirudo_attestation') {
+    return verifyShirudoAttestation({
+      root,
+      evidencePath: plan.args.evidence_path,
+      nonce: plan.args.nonce || '',
+      akName: plan.args.ak_name || '',
+      commandPath,
+      ...(execFileImpl ? { execFileImpl } : {})
+    });
   }
   if (plan.name === 'audit_dependencies') {
     const file = await resolvePath(root, plan.args.path, { any: true });

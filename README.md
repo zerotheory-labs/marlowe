@@ -9,14 +9,14 @@
 </p>
 
 <p>
-  <a href="https://github.com/zerotheory-labs/marlowe/releases/tag/v0.4.0"><img alt="Release v0.4.0" src="https://img.shields.io/badge/release-v0.4.0-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
+  <a href="https://github.com/zerotheory-labs/marlowe/releases/tag/v0.5.0"><img alt="Release v0.5.0" src="https://img.shields.io/badge/release-v0.5.0-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./LICENSE"><img alt="License: PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-e5c07b?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./MacOS"><img alt="macOS Validated" src="https://img.shields.io/badge/macOS-validated_(arm64_%7C_x64)-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./WindowsOS"><img alt="Windows & Linux Experimental" src="https://img.shields.io/badge/Windows_%26_Linux-experimental-6ea8fe?style=flat-square&labelColor=181714" /></a>
 </p>
 
 <p>
-  <a href="#9-cli-security-toolchain"><img alt="9 Local Security CLIs" src="https://img.shields.io/badge/security_CLIs-9_local_engines-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
+  <a href="#10-cli-security-toolchain"><img alt="10 Local Security CLIs" src="https://img.shields.io/badge/security_CLIs-10_local_engines-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./SECURITY.md"><img alt="Renderer CSP: connect-src 'none'" src="https://img.shields.io/badge/renderer_CSP-connect--src_'none'-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="#validation--tests"><img alt="Tests Passing" src="https://img.shields.io/badge/tests-55_unit_%C2%B7_3_E2E_passing-3ddc97?style=flat-square&labelColor=181714" /></a>
 </p>
@@ -37,10 +37,10 @@
 
 ---
 
-**Marlowe.** (`v0.4.0`, by **[Zero Theory Labs](https://github.com/zerotheory-labs)**) is a source-available desktop terminal and cybersecurity workbench. It pairs real interactive shells (`node-pty` + `xterm.js`) with a taint-verifying security agent, **Codebase DNA** entropy mapping, **9-CLI Security Convergence** & **Attack Reachability** graphs, host-enforced **Approve once** gates, `ScopeGate` SSRF confinement, and **SARIF v2.1.0** finding ledgers.
+**Marlowe.** (`v0.5.0`, by **[Zero Theory Labs](https://github.com/zerotheory-labs)**) is a source-available desktop terminal and cybersecurity workbench. It pairs real interactive shells (`node-pty` + `xterm.js`) with a taint-verifying security agent, **Codebase DNA** entropy mapping, **10-CLI Security Convergence** & **Attack Reachability** graphs, **Shirudo Upatch** drafting + TPM 2.0 attestation verification, host-enforced **Approve once** gates, `ScopeGate` SSRF confinement, and **SARIF v2.1.0** finding ledgers.
 
 <p align="center">
-  <img src="./docs/assets/hero-convergence.png" alt="Marlowe — 9-CLI Security Convergence alongside Codebase DNA" width="100%" />
+  <img src="./docs/assets/hero-convergence.png" alt="Marlowe — 10-CLI Security Convergence alongside Codebase DNA" width="100%" />
 </p>
 
 <table>
@@ -60,7 +60,7 @@
 > **Source-Available, Non-Commercial License:** Marlowe is licensed under the **[PolyForm Noncommercial License 1.0.0](./LICENSE)**. Personal, academic, educational, non-profit, and non-commercial security research uses are free. Commercial or workplace use requires a commercial license from **Zero Theory Labs**.
 
 > [!TIP]
-> **Using Claude Code, Cursor, Codex, or GitHub Actions?** Run **[Marlowe CI / Guard](https://github.com/zerotheory-labs/marlowe-ci)** (`v0.1.1`) in your repo with one command for real-time Claude Code hooks, read-only MCP tools, and SARIF PR checks:
+> **Using Claude Code, Cursor, Codex, or GitHub Actions?** Run **[Marlowe CI / Guard](https://github.com/zerotheory-labs/marlowe-ci)** (`v0.3.0`) in your repo with one command for real-time Claude Code hooks, 13 read-only MCP tools, Shirudo Beefile/BPF audits, and SARIF PR checks:
 > ```sh
 > npx --yes github:zerotheory-labs/marlowe-ci init --claude --mcp
 > ```
@@ -108,9 +108,9 @@ npm run package
 
 | Visualization | Location | What It Computes |
 | :--- | :--- | :--- |
-| **Codebase DNA** | Right Drawer (`DNA`) | Plots every workspace file across **Shannon byte entropy (`0.00–8.00 bits/byte`)** × directory lanes × **9-CLI posture** (`Clean`, `Binary / PCAP`, `Medium / Low`, `Critical / High`). Remediated files turn `#3ddc97` green on **Rescan**. |
-| **9-CLI Security Convergence** | Main Stage Tab | Interactive 3-column bipartite graph linking installed local security engines → live workspace & authorized scope assets → corroborated CWE / supply-chain posture. |
-| **Attack Reachability** | Main Stage Tab | Maps untrusted entry surfaces (`HTTP`, `CLI`, `CI`, `Manifest`, `Capture`) → handler modules → code/artifact sinks → actionable blast radius vs. severed static false positives. |
+| **Codebase DNA** | Right Drawer (`DNA`) | Plots every workspace file across **Shannon byte entropy (`0.00–8.00 bits/byte`)** × directory lanes × **10-CLI posture** (`Clean`, `Binary / PCAP`, `UPATCH`, `Medium / Low`, `Critical / High`). Remediated files turn `#3ddc97` green on **Rescan**. |
+| **10-CLI Security Convergence** | Main Stage Tab | Interactive 3-column bipartite graph linking installed local security engines → live workspace & authorized scope assets → corroborated CWE / Shirudo / supply-chain posture. |
+| **Attack Reachability** | Main Stage Tab | Maps untrusted entry surfaces (`HTTP`, `CLI`, `CI`, `Manifest`, `Capture`) → handler modules → code/artifact sinks → actionable blast radius (with **Draft Fix** & **Draft Shield** handoff). |
 
 ---
 
@@ -124,9 +124,9 @@ Press **⌘,** (`Ctrl+,` on Windows/Linux) or click the gear icon to open **Conn
 
 ---
 
-## 9-CLI Security Toolchain
+## 10-CLI Security Toolchain
 
-Marlowe ships **zero-dependency built-in Node.js analyzers** (`scan_secrets`, `audit_code_patterns`, `audit_dependencies` + CycloneDX 1.5 SBOM + OSV.dev, `inspect_http_security`, `inspect_tls`, `dns_recon`, `probe_ports`, `triage_artifact`, `extract_iocs`, `analyze_logs`) that work out of the box.
+Marlowe ships **zero-dependency built-in Node.js analyzers** (`scan_secrets`, `audit_code_patterns`, `audit_dependencies` + CycloneDX 1.5 SBOM + OSV.dev, `inspect_http_security`, `inspect_tls`, `dns_recon`, `probe_ports`, `triage_artifact`, `extract_iocs`, `analyze_logs`, `audit_shirudo_upatch`, `verify_shirudo_attestation`) that work out of the box.
 
 When external CLIs are installed on your verified login `PATH`, **Toolchain Doctor** unlocks `run_security_scanner` via `spawn(binary, argv, { shell: false })` behind **Approve once**:
 
@@ -141,6 +141,7 @@ When external CLIs are installed on your verified login `PATH`, **Toolchain Doct
 | **`tshark`** | PCAP Packet Forensics | Workspace confined · `Approve once` | Structured protocol & conversation summary |
 | **`radare2`** | Binary / ELF / PE Triage | Workspace confined · `Approve once` | Non-executing header, symbol & string inspection |
 | **`otool`** | macOS Mach-O Inspection | Workspace confined · `Approve once` | Linked dylibs, load commands & hardening flags *(macOS)* |
+| **`shirudo`** | eBPF Upatch & TPM 2.0 Attest | Operator-side · `.shirudo` blocked · `Approve once` on draft/run | Audits `Beefile`/`.bpf.c`; verifies TPM quotes cleanly against verified `PATH` |
 
 ---
 
@@ -231,7 +232,7 @@ marlowe/
 │   ├── agent-tools.cjs     # O_NOFOLLOW workspace file tools, ApprovalGate & backups
 │   ├── cyber-scope.cjs     # ScopeGate, DNS-rebinding/SSRF guard & secret redactor
 │   ├── cyber-analyzers.cjs # AppSec, SBOM/OSV, TLS/HTTP/DNS, DFIR, DNA & stage graphs
-│   ├── cyber-toolchain.cjs # Toolchain Doctor & shell:false wrappers for 9 CLIs
+│   ├── cyber-toolchain.cjs # Toolchain Doctor & shell:false wrappers for 10 CLIs
 │   └── findings.cjs        # Deduplicated Findings Ledger, reconciliation & SARIF v2.1.0
 ├── src/                    # Sandboxed UI, Codebase DNA, Convergence & Reachability maps
 └── test/                   # 55 unit tests (*.test.cjs) + 3 Electron E2E suites (*.e2e.cjs)

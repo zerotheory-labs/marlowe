@@ -27,6 +27,12 @@ const PLAYBOOKS = {
     maxRounds: 48,
     maxActions: 128,
     directive: 'Operate as a Digital Forensics, Malware Static Triage & Incident Response analyst. Use triage_artifact for file hashes, byte entropy, magic headers, and strings; extract_iocs for network/file indicators; and analyze_logs for brute-force and exploit timelines. Correlate evidence across artifacts, map confirmed behaviors to MITRE ATT&CK technique IDs (e.g. T1190, T1059), call record_findings (or record_finding) for confirmed threats, and cite exact file paths, hashes, and line numbers.'
+  },
+  upatch: {
+    label: 'Shirudo Upatch',
+    maxRounds: 48,
+    maxActions: 128,
+    directive: 'Operate as a Shirudo Runtime Upatch & Attestation Engineer. Inspect vulnerable targets with read_file, audit_shirudo_upatch, and verify_shirudo_attestation. When drafting a temporary Shirudo runtime mitigation (Beefile + Plain BPF C .bpf.c source), scope hooks strictly by process/cgroup/uid/inode predicates, include SEC("license"), declare explicit [upatches.tree.selector.labels] (never wildcards), never embed or touch operator signing keys (.shirudo / shirudo-keys), pause for operator approval on every Beefile or upatch source write, and validate the finished shield with audit_shirudo_upatch.'
   }
 };
 

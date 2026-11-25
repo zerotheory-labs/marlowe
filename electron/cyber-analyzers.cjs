@@ -725,7 +725,7 @@ async function analyzeLogs(file, relPath, { filter = '' }, signal) {
   };
 }
 
-const DNA_PROTECTED = /^(\.git|\.ssh|\.aws|\.gnupg|\.codex|\.npmrc|\.netrc|\.pypirc|\.env(?:\..*)?|.*\.(?:pem|key))$/i;
+const DNA_PROTECTED = /^(\.git|\.ssh|\.aws|\.gnupg|\.codex|\.shirudo|shirudo-keys|\.npmrc|\.netrc|\.pypirc|\.env(?:\..*)?|.*\.(?:pem|key))$/i;
 const DNA_SKIP_DIRS = new Set([
   'node_modules', '.venv', 'venv', '__pycache__', '.uv-cache', '.cache',
   '.pytest_cache', '.mypy_cache', '.ruff_cache', '.tox', '.nox', '.next',
@@ -909,25 +909,30 @@ async function scanWorkspaceDna(root, { findings = [], tools = [], maxFiles = 26
         const isBinary = buf.subarray(0, Math.min(sampleLen, 4096)).includes(0);
         const rel = pathMod.relative(root, full).split(pathMod.sep).join('/');
         const base = entry.name.toLowerCase();
-        const kind = /^(package(?:-lock)?\.json|pnpm-lock\.yaml|cargo\.(?:lock|toml)|pyproject\.toml|requirements.*\.txt|go\.(?:mod|sum))$/.test(base)
-          ? 'manifest'
-          : /\.(?:pcap|pcapng|cap|log|jsonl)$/.test(base)
-            ? 'capture'
-            : isBinary || /\.(?:dylib|so|exe|dll|bin|wasm|woff2|png|jpg|mp4|zip|gz)$/.test(base)
-              ? 'binary'
-              : (/^(dockerfile|containerfile)$/i.test(base) || /\.(?:tf|tfvars|ya?ml)$/.test(base))
-                ? 'iac'
-                : 'code';
+        const isUpatch = base === 'beefile' || /\.(?:beefile|bpf\.c|upatch\.c|bee|upatch)$/i.test(base);
+        const kind = isUpatch
+          ? 'upatch'
+          : /^(package(?:-lock)?\.json|pnpm-lock\.yaml|cargo\.(?:lock|toml)|pyproject\.toml|requirements.*\.txt|go\.(?:mod|sum))$/.test(base)
+            ? 'manifest'
+            : /\.(?:pcap|pcapng|cap|log|jsonl)$/.test(base)
+              ? 'capture'
+              : isBinary || /\.(?:dylib|so|exe|dll|bin|wasm|woff2|png|jpg|mp4|zip|gz)$/.test(base)
+                ? 'binary'
+                : (/^(dockerfile|containerfile)$/i.test(base) || /\.(?:tf|tfvars|ya?ml)$/.test(base))
+                  ? 'iac'
+                  : 'code';
 
-        const candidateClis = kind === 'manifest'
-          ? ['trivy', 'osv-scanner', 'gitleaks']
-          : kind === 'capture'
-            ? ['tshark', 'gitleaks']
-            : kind === 'binary'
-              ? ['otool', 'radare2', 'trivy']
-              : kind === 'iac'
-                ? ['trivy', 'semgrep', 'gitleaks']
-                : ['semgrep', 'gitleaks', 'trivy'];
+        const candidateClis = kind === 'upatch'
+          ? (/\.(?:bee|upatch)$/i.test(base) || isBinary ? ['shirudo', 'radare2', 'otool'] : ['shirudo', 'semgrep', 'gitleaks'])
+          : kind === 'manifest'
+            ? ['trivy', 'osv-scanner', 'gitleaks']
+            : kind === 'capture'
+              ? ['tshark', 'gitleaks']
+              : kind === 'binary'
+                ? ['otool', 'radare2', 'trivy']
+                : kind === 'iac'
+                  ? ['trivy', 'semgrep', 'gitleaks']
+                  : ['semgrep', 'gitleaks', 'trivy'];
         const activeClis = candidateClis.filter(id => readySet.has(id));
 
         const fileFindings = activeFindings.filter(f => {
@@ -1046,7 +1051,7 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
     ? await scanWorkspaceDna(root, { findings, tools, maxFiles: 220 })
     : { workspace: '', files: [], summary: { totalFiles: 0, peakEntropy: 0, highEntropyCount: 0, affectedFilesCount: 0, openFindingsCount: 0, hotspotCount: 0, readyEngines: [], readyCount: tools.filter(t => t.available).length, totalEngines: tools.length } };
 
-  const ENGINE_ORDER = ['semgrep', 'gitleaks', 'trivy', 'osv-scanner', 'nmap', 'nuclei', 'tshark', 'radare2', 'otool'];
+  const ENGINE_ORDER = ['semgrep', 'gitleaks', 'trivy', 'osv-scanner', 'nmap', 'nuclei', 'tshark', 'radare2', 'otool', 'shirudo'];
   const engines = ENGINE_ORDER.map(id => {
     const found = tools.find(t => t.id === id);
     return {
@@ -1061,21 +1066,23 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
   const activeFindings = (findings || []).filter(f => f.status === 'open' || f.status === 'verified');
   const resolvedFindings = (findings || []).filter(f => f.status === 'mitigated' || f.status === 'false-positive');
 
-  // --- 1. Build 9-CLI Convergence Nodes & Links ---
+  // --- 1. Build 10-CLI Convergence Nodes & Links ---
   const pickedAssets = [];
   const usedPaths = new Set();
   const addFileAsset = file => {
     if (!file || usedPaths.has(file.path) || pickedAssets.length >= 7) return;
     usedPaths.add(file.path);
-    const allCand = file.kind === 'manifest'
-      ? ['trivy', 'osv-scanner', 'gitleaks']
-      : file.kind === 'capture'
-        ? ['tshark', 'gitleaks']
-        : file.kind === 'binary'
-          ? ['otool', 'radare2', 'trivy']
-          : file.kind === 'iac'
-            ? ['trivy', 'semgrep', 'gitleaks']
-            : ['semgrep', 'gitleaks', 'trivy'];
+    const allCand = file.kind === 'upatch'
+      ? (/\.(?:bee|upatch)$/i.test(file.path) || file.isBinary ? ['shirudo', 'radare2', 'otool'] : ['shirudo', 'semgrep', 'gitleaks'])
+      : file.kind === 'manifest'
+        ? ['trivy', 'osv-scanner', 'gitleaks']
+        : file.kind === 'capture'
+          ? ['tshark', 'gitleaks']
+          : file.kind === 'binary'
+            ? ['otool', 'radare2', 'trivy']
+            : file.kind === 'iac'
+              ? ['trivy', 'semgrep', 'gitleaks']
+              : ['semgrep', 'gitleaks', 'trivy'];
     const status = (file.maxSeverity === 'critical' || file.maxSeverity === 'high')
       ? 'crit'
       : file.findingCount > 0
@@ -1126,8 +1133,8 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
     });
   }
 
-  // Diverse clean/artifact representatives (binary, capture, manifest, iac, code)
-  for (const kind of ['binary', 'capture', 'manifest', 'iac', 'code']) {
+  // Diverse clean/artifact representatives (upatch, binary, capture, manifest, iac, code)
+  for (const kind of ['upatch', 'binary', 'capture', 'manifest', 'iac', 'code']) {
     const match = dna.files.find(f => f.kind === kind && !usedPaths.has(f.path));
     if (match) addFileAsset(match);
   }
@@ -1179,6 +1186,14 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
         status: 'binary',
         badge: 'TRIAGED · CLEAN',
         detail: `Binary & capture telemetry mapped to otool, Radare2 & TShark (peak ${dna.summary.peakEntropy.toFixed(2)} b/B).`
+      });
+      asset.impactIds.push(imp.id);
+    } else if (asset.kind === 'upatch') {
+      const imp = ensureImpact('imp:shirudo-upatch', {
+        label: 'Shirudo Upatch · Shield Posture',
+        status: 'clean',
+        badge: 'SHIRUDO · BPF',
+        detail: 'Shirudo Beefile & eBPF upatch shields verified for scoping, license declaration, and signing hygiene.'
       });
       asset.impactIds.push(imp.id);
     } else if (asset.kind === 'manifest' || asset.kind === 'iac') {

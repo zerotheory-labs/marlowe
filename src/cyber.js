@@ -2,7 +2,7 @@ const SEVERITIES = ['critical', 'high', 'medium', 'low', 'info'];
 const STATUSES = ['open', 'verified', 'mitigated', 'false-positive'];
 const CORE_PACK_IDS = ['gitleaks', 'osv-scanner', 'trivy', 'semgrep'];
 
-export function setupCyber(api, { notify, caught, onDraftFix, onAuditFile, onScopeUpdated, onSwitchTab, onInstallCommand }) {
+export function setupCyber(api, { notify, caught, onDraftFix, onDraftShield, onAuditFile, onScopeUpdated, onSwitchTab, onInstallCommand }) {
   const $ = id => document.getElementById(id);
   const el = (tag, cls, text) => {
     const n = document.createElement(tag);
@@ -230,6 +230,17 @@ export function setupCyber(api, { notify, caught, onDraftFix, onAuditFile, onSco
         onDraftFix(item);
       });
 
+      let shieldBtn = null;
+      if (!isResolved && onDraftShield) {
+        shieldBtn = el('button', 'secondary-button compact-btn', 'Draft Shield');
+        shieldBtn.type = 'button';
+        shieldBtn.title = 'Draft a temporary Shirudo eBPF upatch shield in Agent mode';
+        shieldBtn.addEventListener('click', () => {
+          onSwitchTab('assistant');
+          onDraftShield(item);
+        });
+      }
+
       const sameTitleActive = findings.filter(f => (f.status === 'open' || f.status === 'verified') && f.title === item.title);
       let dismissRuleBtn = null;
       if (!isResolved && sameTitleActive.length > 1) {
@@ -255,7 +266,7 @@ export function setupCyber(api, { notify, caught, onDraftFix, onAuditFile, onSco
         renderFindings();
       }));
 
-      actions.append(statusSelect, fixBtn, ...(dismissRuleBtn ? [dismissRuleBtn] : []), delBtn);
+      actions.append(statusSelect, fixBtn, ...(shieldBtn ? [shieldBtn] : []), ...(dismissRuleBtn ? [dismissRuleBtn] : []), delBtn);
       card.append(head, loc, details, actions);
       listHost.append(card);
     }
@@ -305,6 +316,7 @@ export function setupCyber(api, { notify, caught, onDraftFix, onAuditFile, onSco
       return { cls: 'warn', hex: '#f2c14e', label: item.maxSeverity.toUpperCase() };
     }
     if (item.kind === 'binary' || item.kind === 'capture') return { cls: 'binary', hex: '#7eafff', label: item.kind.toUpperCase() };
+    if (item.kind === 'upatch') return { cls: 'clean', hex: '#3ddc97', label: 'UPATCH' };
     return { cls: 'clean', hex: '#3ddc97', label: 'CLEAN' };
   }
 
@@ -424,7 +436,7 @@ export function setupCyber(api, { notify, caught, onDraftFix, onAuditFile, onSco
     const filtered = dnaData.files.filter(f => {
       if (dnaFilter === 'hotspots') return f.findingCount > 0 || (f.entropy >= 7.2 && !/\.(?:woff2|png|jpg|mp4|gz|zip)$/i.test(f.path));
       if (dnaFilter === 'entropy') return f.entropy >= 6.4;
-      if (dnaFilter === 'artifacts') return f.kind === 'binary' || f.kind === 'capture' || f.kind === 'manifest';
+      if (dnaFilter === 'artifacts') return f.kind === 'binary' || f.kind === 'capture' || f.kind === 'manifest' || f.kind === 'upatch';
       return true;
     });
 

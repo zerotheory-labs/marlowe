@@ -80,6 +80,7 @@ const cyber = setupCyber(api, {
     stageGraphs?.refreshIfVisible();
   },
   onDraftFix: draftFixForFinding,
+  onDraftShield: draftShieldForFinding,
   onAuditFile: auditWorkspaceFile
 });
 
@@ -98,6 +99,18 @@ function draftFixForFinding(finding) {
     ? ` After applying a real code fix, call update_finding_status (finding_id: "${finding.id}", status: "mitigated").${isTaintSink ? ` Only if reading the code proves this sink renders hardcoded static constants with zero untrusted external/user input, call update_finding_status (finding_id: "${finding.id}", status: "false-positive") instead of editing.` : ''}`
     : '';
   $('prompt').value = `Remediate finding [${finding.severity.toUpperCase()}] "${finding.title}"${finding.cwe ? ' (' + finding.cwe + ')' : ''} at ${finding.location}. Read the relevant section with read_file${lineHint} (and search_text if the sink is further down in a large file), then call edit_file to apply a minimal safe code fix.${statusHint}`;
+  $('prompt').focus();
+}
+
+function draftShieldForFinding(finding) {
+  switchRightTab('assistant');
+  if (folderChosen) {
+    mode = 'agent';
+    playbook = 'upatch';
+    $('playbook-select').value = 'upatch';
+    updateMode();
+  }
+  $('prompt').value = `Draft a temporary Shirudo runtime shield (Beefile + scoped Plain BPF C .bpf.c upatch) under shirudo-shields/ to mitigate finding [${finding.severity.toUpperCase()}] "${finding.title}"${finding.cwe ? ' (' + finding.cwe + ')' : ''} at ${finding.location}. Inspect ${finding.location} with read_file first, scope the upatch with explicit [upatches.tree.selector.labels] and SEC("license"), pause at Marlowe's approval gate for review, and validate the draft with audit_shirudo_upatch. Never read or write operator signing keys or push/load shields automatically.`;
   $('prompt').focus();
 }
 
@@ -155,7 +168,7 @@ function activate(id) {
   }
   if (isGraph) {
     stageGraphs.activate(id);
-    $('shell-status').textContent = id === 'convergence' ? 'Marlowe · 9-CLI Convergence' : 'Marlowe · Attack Reachability';
+    $('shell-status').textContent = id === 'convergence' ? 'Marlowe · 10-CLI Convergence' : 'Marlowe · Attack Reachability';
     $('shell-path').textContent = folderChosen ? workspace : '';
     $('shell-path').title = folderChosen ? `Workspace: ${workspace}` : '';
     $('shell-dot').style.background = '';
@@ -1277,6 +1290,7 @@ async function boot() {
     onEnsureWorkspace: openPicker => ensureShellWorkspace(openPicker),
     onAuditAsset: item => auditWorkspaceFile(item),
     onDraftFix: finding => draftFixForFinding(finding),
+    onDraftShield: finding => draftShieldForFinding(finding),
     onOpenDna: () => cyber.openDnaDialog(),
     onOpenScope: () => cyber.openScopeDialog(),
     onFindingsMutated: () => cyber.syncFindings()

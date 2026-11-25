@@ -72,7 +72,7 @@
           <div class="messages" id="messages" role="log" aria-label="Conversation">
             <div class="welcome" id="welcome">
               <div class="welcome-top">
-                <span class="marlowe-eyebrow eyebrow">Zero Theory Labs · v0.4</span>
+                <span class="marlowe-eyebrow eyebrow">Zero Theory Labs · v0.5</span>
                 <svg class="marlowe-dots" viewBox="360 72 112 80" aria-hidden="true"><circle cx="432" cy="80" r="4"></circle><circle cx="464" cy="80" r="4"></circle><circle cx="400" cy="112" r="4"></circle><circle cx="432" cy="112" r="4"></circle><circle cx="464" cy="112" r="4"></circle><circle cx="368" cy="144" r="4"></circle><circle cx="400" cy="144" r="4"></circle><circle cx="432" cy="144" r="4"></circle><circle cx="464" cy="144" r="4"></circle></svg>
               </div>
               <h2>Security for AI.<br><em>A little more careful.</em></h2>
@@ -104,6 +104,7 @@
                     <option value="appsec">AppSec Audit</option>
                     <option value="recon">Authorized Recon</option>
                     <option value="dfir">DFIR Triage</option>
+                    <option value="upatch">Shirudo Upatch</option>
                   </select>
                 </div>
                 <div class="composer-send-group">
@@ -130,18 +131,18 @@
                 <button type="button" class="text-button" id="clear-findings">Clear</button>
               </div>
             </div>
-            <p id="findings-empty" class="settings-note">No recorded findings yet. Run an AppSec, Recon, or DFIR playbook in Agent mode to record verified issues here.</p>
+            <p id="findings-empty" class="settings-note">No recorded findings yet. Run an AppSec, Recon, DFIR, or Shirudo Upatch playbook in Agent mode to record verified issues here.</p>
             <div id="findings-list" class="findings-list"></div>
           </div>
         </div>
 
-        <!-- Tab 3: Codebase DNA Dot-Matrix Map (Entropy × 9-CLI Posture) -->
+        <!-- Tab 3: Codebase DNA Dot-Matrix Map (Entropy × 10-CLI Posture) -->
         <div id="dna-dialog" class="drawer-view inline-panel" hidden>
           <div class="inline-panel-scroll">
             <div class="dialog-heading">
               <div>
                 <h3>Codebase DNA</h3>
-                <p class="settings-note dna-subtitle">Shannon byte entropy (0–8 bits/byte) × 9-CLI security posture.</p>
+                <p class="settings-note dna-subtitle">Shannon byte entropy (0–8 bits/byte) × 10-CLI security posture.</p>
               </div>
               <button type="button" class="secondary-button compact-btn" id="dna-refresh">Rescan</button>
             </div>

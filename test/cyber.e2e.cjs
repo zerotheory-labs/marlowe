@@ -172,7 +172,7 @@ test('cybersecurity scope gate, toolchain doctor, appsec playbook, secret maskin
   const sarif = JSON.parse(await fs.readFile(sarifPath, 'utf8'));
   expect(sarif.runs[0].results.length).toBe(2);
 
-  // Inspect Codebase DNA dot-matrix map (Shannon byte entropy × 9-CLI security posture)
+  // Inspect Codebase DNA dot-matrix map (Shannon byte entropy × 10-CLI security posture)
   await page.locator('#dna-button').click();
   await expect(page.locator('#dna-dialog')).toBeVisible();
   await expect(page.locator('#dna-svg .dna-dot-node')).toHaveCount(7);
@@ -180,12 +180,12 @@ test('cybersecurity scope gate, toolchain doctor, appsec playbook, secret maskin
   await expect(page.locator('#dna-inspector')).toContainText('CRITICAL');
   await page.screenshot({ path: 'test-results/marlowe-dna.png', scale: 'css' });
 
-  // Inspect 9-CLI Convergence & Attack Reachability tabs alongside Marlowe in the main stage
+  // Inspect 10-CLI Convergence & Attack Reachability tabs alongside Marlowe in the main stage
   await page.locator('#convergence-tab').click();
   await expect(page.locator('#convergence-stage')).toBeVisible();
   await expect(page.locator('#convergence-stage button', { hasText: 'Rescan' })).toBeEnabled();
   await expect(page.locator('#convergence-stage .stage-svg-node').first()).toBeVisible();
-  await expect(page.locator('#convergence-stage')).toContainText('9-CLI Security Convergence');
+  await expect(page.locator('#convergence-stage')).toContainText('10-CLI Security Convergence');
   await page.screenshot({ path: 'test-results/marlowe-convergence.png', scale: 'css' });
 
   await page.locator('#reachability-tab').click();

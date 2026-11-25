@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
 const { validateScopeConfig, assertTargetInScope, isPrivateOrReservedIp, redactSecrets } = require('../electron/cyber-scope.cjs');
-const { prepareTool, executeTool } = require('../electron/agent-tools.cjs');
+const { prepareTool, executeTool, toolsForPlaybook } = require('../electron/agent-tools.cjs');
 const { detectSecurityTools } = require('../electron/cyber-toolchain.cjs');
 const { scanWorkspaceDna, reconcileWorkspaceFindings, buildWorkspaceGraphs } = require('../electron/cyber-analyzers.cjs');
 const { createFindingsStore, toMarkdownReport, toSarifReport } = require('../electron/findings.cjs');
@@ -508,8 +508,93 @@ test('scanWorkspaceDna maps Shannon byte entropy, skips symlinks & protected dot
     tools: [{ id: 'semgrep', label: 'Semgrep', available: true }, { id: 'nmap', label: 'Nmap', available: true }],
     scope: { targets: ['api.example.com'] }
   });
-  assert.equal(graphs.convergence.engines.length, 9);
+  assert.equal(graphs.convergence.engines.length, 10);
   assert.ok(graphs.convergence.assets.some(a => a.kind === 'scope' && a.path === 'api.example.com'));
   assert.ok(graphs.reachability.lanes.some(l => l.state === 'severed'));
   assert.ok(graphs.reachability.lanes.some(l => l.path === 'src/router.js'));
+}));
+
+test('Shirudo integration enforces operator gate on drafts, blocks signing keys, audits Beefiles/BPF, and verifies TPM quotes', () => fixture(async f => {
+  // 1. Sensitive key directories are blocked from read_file / write_file
+  await fs.mkdir(path.join(f.root, '.shirudo'), { recursive: true });
+  await fs.writeFile(path.join(f.root, '.shirudo', 'operator.key'), 'secret-key');
+  await assert.rejects(prepareTool(f.root, 'read_file', { path: '.shirudo/operator.key' }), /Sensitive/);
+  await assert.rejects(prepareTool(f.root, 'read_file', { path: 'shirudo-keys/ml-dsa.pem' }), /Sensitive/);
+
+  // 2. Writing even a brand-new Beefile or *.bpf.c MUST require operator approval
+  await fs.mkdir(path.join(f.root, 'shirudo-shields'), { recursive: true });
+  const draftBeefile = await prepareTool(f.root, 'write_file', {
+    path: 'shirudo-shields/Beefile',
+    content: '[package]\nname = "demo"\n\n[[upatches]]\nsource = "guard.bpf.c"\ntype = "bpf"\n\n[upatches.tree.selector.labels]\nrole = ["edge"]\n'
+  });
+  assert.ok(draftBeefile.reason.includes('Shirudo'));
+
+  const draftBpf = await prepareTool(f.root, 'write_file', {
+    path: 'shirudo-shields/guard.bpf.c',
+    content: 'char LICENSE[] SEC("license") = "Dual BSD/GPL";\nSEC("lsm/file_open")\nint h(void *ctx) { unsigned int p = bpf_get_current_pid_tgid(); return p ? 0 : 0; }\n'
+  });
+  assert.ok(draftBpf.reason.includes('Shirudo'));
+
+  // 3. upatch playbook includes Shirudo + AppSec/DFIR tools
+  const upatchToolNames = toolsForPlaybook('upatch', { targets: [] }).map(t => t.function.name);
+  assert.ok(upatchToolNames.includes('audit_shirudo_upatch'));
+  assert.ok(upatchToolNames.includes('verify_shirudo_attestation'));
+
+  // 4. Write Beefile + .bpf.c + evidence JSON and test audit_shirudo_upatch & verify_shirudo_attestation
+  await fs.writeFile(path.join(f.root, 'shirudo-shields/Beefile'), draftBeefile.args.content);
+  await fs.writeFile(path.join(f.root, 'shirudo-shields/guard.bpf.c'), draftBpf.args.content);
+  await fs.writeFile(path.join(f.root, 'evidence.json'), JSON.stringify({ quote: 'tpm2', upatches: ['demo'] }));
+
+  const auditClean = await executeTool(f.root, await prepareTool(f.root, 'audit_shirudo_upatch', { path: 'shirudo-shields' }), f);
+  assert.equal(auditClean.verdict, 'holds');
+
+  // Corrupt .bpf.c with bpf_probe_write_user -> FAILS
+  await fs.writeFile(path.join(f.root, 'shirudo-shields/bad.bpf.c'), 'char LICENSE[] SEC("license") = "Dual BSD/GPL";\nint bad() { return bpf_probe_write_user(0, 0, 0); }\n');
+  const auditBad = await executeTool(f.root, await prepareTool(f.root, 'audit_shirudo_upatch', { path: 'shirudo-shields' }), f);
+  assert.equal(auditBad.verdict, 'fails');
+  assert.ok(auditBad.findings.some(x => x.cwe === 'CWE-787'));
+
+  // Missing shirudo CLI -> CAN'T TELL; rogue workspace shirudo ignored
+  await fs.writeFile(path.join(f.root, 'shirudo'), '#!/bin/sh\necho PWNED\n', { mode: 0o755 });
+  const doctorRogue = await detectSecurityTools(f.root, { root: f.root });
+  assert.equal(doctorRogue.tools.find(t => t.id === 'shirudo').available, false);
+
+  const attestMissing = await executeTool(f.root, await prepareTool(f.root, 'verify_shirudo_attestation', { evidence_path: 'evidence.json', nonce: 'deadbeef' }), { ...f, commandPath: f.root });
+  assert.equal(attestMissing.verdict, 'cant-tell');
+
+  if (process.platform !== 'win32') {
+    const trustedBin = path.join(f.dir, 'shirudo-trusted');
+    await fs.mkdir(trustedBin, { recursive: true });
+    await fs.writeFile(path.join(trustedBin, 'shirudo'), '#!/bin/sh\necho "0.9.0"\n', { mode: 0o755 });
+
+    const doctorOk = await detectSecurityTools(trustedBin, { root: f.root });
+    assert.equal(doctorOk.tools.find(t => t.id === 'shirudo').available, true);
+
+    const attestOk = await executeTool(
+      f.root,
+      await prepareTool(f.root, 'verify_shirudo_attestation', { evidence_path: 'evidence.json', nonce: 'deadbeef' }),
+      { ...f, commandPath: `${trustedBin}:/usr/bin:/bin`, execFileImpl: async () => ({ stdout: 'TPM verified', stderr: '' }) }
+    );
+    assert.equal(attestOk.verdict, 'holds');
+    assert.equal(attestOk.verified, true);
+
+    const attestFail = await executeTool(
+      f.root,
+      await prepareTool(f.root, 'verify_shirudo_attestation', { evidence_path: 'evidence.json', nonce: 'deadbeef' }),
+      { ...f, commandPath: `${trustedBin}:/usr/bin:/bin`, execFileImpl: async () => { const e = new Error('bad signature'); e.stderr = 'quote mismatch'; throw e; } }
+    );
+    assert.equal(attestFail.verdict, 'fails');
+    assert.equal(attestFail.verified, false);
+  }
+
+  // 5. DNA + 10-CLI Convergence recognize Beefile as kind: 'upatch' mapped to 'shirudo'
+  const graphs = await buildWorkspaceGraphs(f.root, {
+    findings: [],
+    tools: [{ id: 'shirudo', label: 'Shirudo (eBPF Upatch)', available: true }],
+    scope: { targets: [] }
+  });
+  const beefileAsset = graphs.convergence.assets.find(a => a.path === 'shirudo-shields/Beefile');
+  assert.ok(beefileAsset);
+  assert.equal(beefileAsset.kind, 'upatch');
+  assert.ok(beefileAsset.engineIds.includes('shirudo'));
 }));

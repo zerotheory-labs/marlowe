@@ -20,7 +20,8 @@ function hintFor(specId) {
       nuclei: 'winget install ProjectDiscovery.Nuclei',
       tshark: 'winget install WiresharkFoundation.Wireshark',
       radare2: 'winget install RadareOrg.Radare2',
-      otool: 'macOS only (use radare2 on Windows)'
+      otool: 'macOS only (use radare2 on Windows)',
+      shirudo: 'https://github.com/shirudo-dev/shirudo'
     };
     return winHints[specId] || '';
   }
@@ -34,7 +35,8 @@ function hintFor(specId) {
       nuclei: 'brew install nuclei',
       tshark: 'sudo apt install tshark',
       radare2: 'sudo apt install radare2',
-      otool: 'macOS only (use radare2 on Linux)'
+      otool: 'macOS only (use radare2 on Linux)',
+      shirudo: 'https://github.com/shirudo-dev/shirudo'
     };
     return linuxHints[specId] || '';
   }
@@ -47,7 +49,8 @@ function hintFor(specId) {
     nuclei: 'brew install nuclei',
     tshark: 'brew install wireshark',
     radare2: 'brew install radare2',
-    otool: 'xcode-select --install'
+    otool: 'xcode-select --install',
+    shirudo: 'https://github.com/shirudo-dev/shirudo'
   };
   return macHints[specId] || '';
 }
@@ -61,7 +64,8 @@ const TOOL_CATALOG = [
   { id: 'nuclei', binary: 'nuclei', label: 'Nuclei', category: 'Scope-Gated Web/Template', versionArgs: ['-version'], installHint: hintFor('nuclei'), runnable: true, network: true, profiles: ['misconfiguration', 'exposures', 'cves-safe'] },
   { id: 'tshark', binary: 'tshark', label: 'TShark (Wireshark CLI)', category: 'Packet / PCAP Forensics', versionArgs: ['--version'], installHint: hintFor('tshark'), runnable: false, profiles: [] },
   { id: 'radare2', binary: 'radare2', label: 'Radare2', category: 'Binary Reverse Engineering', versionArgs: ['-v'], installHint: hintFor('radare2'), runnable: false, profiles: [] },
-  { id: 'otool', binary: 'otool', label: 'otool (macOS Mach-O)', category: 'Binary Inspection', versionArgs: ['--version'], installHint: hintFor('otool'), runnable: false, profiles: [] }
+  { id: 'otool', binary: 'otool', label: 'otool (macOS Mach-O)', category: 'Binary Inspection', versionArgs: ['--version'], installHint: hintFor('otool'), runnable: false, profiles: [] },
+  { id: 'shirudo', binary: 'shirudo', label: 'Shirudo (eBPF Upatch)', category: 'Runtime Upatch / TPM Attest', versionArgs: ['version'], installHint: hintFor('shirudo'), runnable: true, profiles: ['status', 'upatch-list', 'upatch-info'] }
 ];
 
 function isInsideWorkspace(candidateReal, workspaceReal, platform = process.platform) {
@@ -196,6 +200,11 @@ function buildScannerArgs(spec, profile, safeTarget) {
       const tags = profile === 'exposures' ? 'exposure,panel' : profile === 'cves-safe' ? 'cve' : 'misconfig,headers,ssl';
       return ['-u', safeTarget, '-tags', tags, '-es', 'dos,fuzz,intrusive', '-jsonl', '-silent', '-nc'];
     }
+    case 'shirudo': {
+      if (profile === 'upatch-list') return ['upatch', 'list'];
+      if (profile === 'upatch-info') return ['upatch', 'info', '--json', safeTarget];
+      return ['status', '--json', '--show-full'];
+    }
     default:
       throw new Error(`Unsupported scanner "${spec.id}".`);
   }
@@ -274,6 +283,17 @@ function parseScannerStructuredOutput(scannerId, rawOutput) {
           findings.push({ template: item['template-id'], severity: item.info?.severity || 'info', matched: item['matched-at'] || item.host, name: item.info?.name || '' });
         } catch {}
       }
+    } else if (scannerId === 'shirudo') {
+      try {
+        const data = JSON.parse(rawOutput);
+        if (data && typeof data === 'object') {
+          findings.push({
+            id: 'shirudo-status',
+            severity: 'info',
+            summary: data.status || (Array.isArray(data.upatches) ? `${data.upatches.length} active upatch(es)` : 'Shirudo telemetry retrieved')
+          });
+        }
+      } catch { /* Fallback to bounded text output */ }
     }
   } catch { /* Fallback to bounded text output when scanner prints plain text. */ }
   return findings;

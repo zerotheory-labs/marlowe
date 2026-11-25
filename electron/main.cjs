@@ -115,7 +115,7 @@ function registerHandlers() {
     return detectSecurityTools(resolved, { root: folderChosen ? folder : '' });
   });
   handle('cyber:dna', async () => {
-    if (!folderChosen) return { workspace: '', files: [], summary: { totalFiles: 0, peakEntropy: 0, highEntropyCount: 0, hotspotCount: 0, readyEngines: [], readyCount: 0, totalEngines: 9 }, needsWorkspace: true };
+    if (!folderChosen) return { workspace: '', files: [], summary: { totalFiles: 0, peakEntropy: 0, highEntropyCount: 0, hotspotCount: 0, readyEngines: [], readyCount: 0, totalEngines: 10 }, needsWorkspace: true };
     let resolved = await toolPath;
     if (!resolved) {
       const { BENJAMIN_TEST_DATA, ELECTRON_RUN_AS_NODE, ...env } = process.env;

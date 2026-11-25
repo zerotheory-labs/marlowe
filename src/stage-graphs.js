@@ -52,6 +52,7 @@ export function setupStageGraphs(api, {
   onEnsureWorkspace,
   onAuditAsset,
   onDraftFix,
+  onDraftShield,
   onOpenDna,
   onOpenScope,
   onFindingsMutated
@@ -120,8 +121,8 @@ export function setupStageGraphs(api, {
 
   createGraphTab(
     'convergence',
-    '9-CLI Convergence',
-    '9-CLI Security Convergence',
+    '10-CLI Convergence',
+    '10-CLI Security Convergence',
     'Installed local security engines → live workspace & scope assets → corroborated CWE / artifact posture.'
   );
   createGraphTab(
@@ -191,9 +192,10 @@ export function setupStageGraphs(api, {
       }, label));
     }
 
+    const engStep = engines.length > 1 ? Math.min(41, Math.floor(338 / (engines.length - 1))) : 0;
     const engPos = new Map();
     engines.forEach((eng, i) => {
-      engPos.set(eng.id, { ...eng, x: 24, w: 192, y: 52 + i * 41 });
+      engPos.set(eng.id, { ...eng, x: 24, w: 192, y: 48 + i * engStep });
     });
 
     const assetSpacing = assets.length > 1 ? Math.min(58, Math.floor(336 / Math.max(1, assets.length - 1))) : 0;
@@ -259,7 +261,7 @@ export function setupStageGraphs(api, {
     if (!assets.length) {
       view.svg.append(svgEl('text', {
         x: 405, y: 224, 'text-anchor': 'middle', fill: c.mute, 'font-size': '12'
-      }, 'Choose a workspace folder to connect your 9 CLIs to live source files & binaries.'));
+      }, 'Choose a workspace folder to connect your 10 CLIs to live source files & binaries.'));
     }
 
     const inspectEngine = e => {
@@ -463,6 +465,12 @@ export function setupStageGraphs(api, {
         fixBtn.addEventListener('click', () => onDraftFix(lane.finding));
         btns.push(fixBtn);
       }
+      if (lane.finding && onDraftShield && lane.finding.status !== 'mitigated' && lane.finding.status !== 'false-positive') {
+        const shieldBtn = el('button', 'secondary-button compact-btn', 'Draft Shield');
+        shieldBtn.type = 'button';
+        shieldBtn.addEventListener('click', () => onDraftShield(lane.finding));
+        btns.push(shieldBtn);
+      }
       if (lane.findingIds?.length) {
         for (const [label, st] of [['Mark Mitigated ✓', 'mitigated'], ['False Positive', 'false-positive']]) {
           const b = el('button', 'secondary-button compact-btn', label);
@@ -585,7 +593,7 @@ export function setupStageGraphs(api, {
       await onEnsureWorkspace(false);
       graphData = await api.scanGraphs();
       renderAll();
-      if (manual) notify('Updated 9-CLI Convergence & Attack Reachability maps.');
+      if (manual) notify('Updated 10-CLI Convergence & Attack Reachability maps.');
     } catch (err) {
       notify('Could not build security graphs: ' + (err.message || err));
     } finally {
