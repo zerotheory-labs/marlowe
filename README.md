@@ -22,6 +22,7 @@
 </p>
 
 <p>
+  <a href="https://github.com/zerotheory-labs/marlowe-ci"><b>Marlowe CI</b></a> &nbsp;·&nbsp;
   <a href="./MacOS"><b>MacOS/</b></a> &nbsp;·&nbsp;
   <a href="./WindowsOS"><b>WindowsOS/</b></a> &nbsp;·&nbsp;
   <a href="./LinuxOS"><b>LinuxOS/</b></a> &nbsp;·&nbsp;
@@ -57,6 +58,12 @@
 
 > [!IMPORTANT]
 > **Source-Available, Non-Commercial License:** Marlowe is licensed under the **[PolyForm Noncommercial License 1.0.0](./LICENSE)**. Personal, academic, educational, non-profit, and non-commercial security research uses are free. Commercial or workplace use requires a commercial license from **Zero Theory Labs**.
+
+> [!TIP]
+> **Using Claude Code, Cursor, Codex, or GitHub Actions?** Run **[Marlowe CI / Guard](https://github.com/zerotheory-labs/marlowe-ci)** (`v0.1.1`) in your repo with one command for real-time Claude Code hooks, read-only MCP tools, and SARIF PR checks:
+> ```sh
+> npx --yes github:zerotheory-labs/marlowe-ci init --claude --mcp
+> ```
 
 ---
 
