@@ -70,8 +70,8 @@ const CYBER_TOOLS = [
   schema('triage_artifact', 'Forensic static triage of a workspace file or binary (up to 10 MB): computes SHA-256/SHA-1/MD5 hashes, byte Shannon entropy (packing/encryption indicator), ELF/Mach-O/PE/PDF/PCAP header metadata, and notable printable strings.', { path: str('Workspace-relative file path') }, ['path']),
   schema('extract_iocs', 'Extract and classify Indicators of Compromise (public/private IPs, domains, URLs, SHA-256/SHA-1/MD5 hashes, CVEs, and MITRE ATT&CK technique IDs) from a workspace file or log.', { path: str('Workspace-relative file path') }, ['path']),
   schema('analyze_logs', 'Analyze JSONL, HTTP access, or syslog/auth log files (up to 10 MB) for brute-force spikes, traversal/SQLi/XSS/JNDI/SSRF probes, scanner signatures, and top source IPs.', { path: str('Workspace-relative log file path'), filter: str('Optional case-insensitive substring filter') }, ['path']),
-  schema('audit_shirudo_upatch', 'Audit Shirudo Beefiles, Plain BPF C (.bpf.c/.upatch.c) runtime upatches, and .bee/.upatch bundles for embedded keys, insecure registries, path traversal, unsafe BPF helpers, and wildcard selectors.', { path: str('Workspace-relative path to a Beefile, .bpf.c file, .bee package, or directory (e.g. ".")') }, ['path']),
-  schema('verify_shirudo_attestation', 'Inspect a Shirudo TPM 2.0 attestation evidence JSON file in the workspace and verify it offline via trusted shirudo CLI when installed.', { evidence_path: str('Workspace-relative path to the Shirudo TPM 2.0 attestation evidence JSON file'), nonce: str('Optional expected hex nonce (8-128 hex chars)'), ak_name: str('Optional expected attestation key (AK) name') }, ['evidence_path']),
+  schema('audit_shirudo_upatch', 'Audit Shirudo Beefiles, Plain BPF C (.bpf.c/.upatch.c) runtime upatches, and .bee/.upatch bundles for embedded keys, insecure registries, path traversal, unsafe BPF helpers, fmod_ret bounds, and selector/rodata invariants.', { path: str('Workspace-relative path to a Beefile, .bpf.c file, .bee package, or directory (e.g. ".")') }, ['path']),
+  schema('verify_shirudo_attestation', 'Inspect a Shirudo TPM 2.0 attestation evidence JSON file in the workspace and verify it offline via policy checks and trusted shirudo CLI when installed.', { evidence_path: str('Workspace-relative path to the Shirudo TPM 2.0 attestation evidence JSON file'), nonce: str('Optional expected hex nonce (8-128 hex chars)'), ak_name: str('Optional expected attestation key (AK) name'), expected_pcr11: str('Optional expected PCR 11 measured boot digest (64 hex chars)'), expected_config_root: str('Optional expected active Shirudo config root hash') }, ['evidence_path']),
   schema('run_security_scanner', 'Execute an installed external security CLI (semgrep, trivy, gitleaks, osv-scanner, nmap, nuclei, or shirudo) using safe preset arguments without shell interpolation. Always requires user approval.', { scanner: str('Scanner ID: semgrep, trivy, gitleaks, osv-scanner, nmap, nuclei, or shirudo'), target: str('Workspace-relative path for local scanners, Authorized Scope host/URL for nmap/nuclei, or "." / upatch path for shirudo'), profile: str('Optional preset profile (e.g. auto, owasp-top-ten, secrets, fs-vuln, fs-misconfig, fs-all, dir-no-git, workspace, top-100-ports, service-version, misconfiguration, exposures, cves-safe, status, upatch-list, upatch-info)'), timeout_seconds: int('Optional time limit in seconds, from 10 to 600 (default 120)') }, ['scanner', 'target']),
   schema('record_finding', 'Record a single verified security vulnerability, misconfiguration, or incident finding into the workspace Findings Ledger (for UI review and SARIF/Markdown export). Only record findings where untrusted input or real secret/CVE exposure is verified.', FINDING_PROPERTIES, FINDING_REQUIRED),
   schema('record_findings', 'Record multiple verified security findings into the workspace Findings Ledger in a single step (up to 50 findings per call). Never record unverified sink candidates or static UI constants.', { findings: { type: 'array', description: 'Non-empty array of verified findings (1 to 50 items)', items: { type: 'object', properties: FINDING_PROPERTIES, required: FINDING_REQUIRED, additionalProperties: false } } }, ['findings']),
@@ -455,10 +455,12 @@ async function prepareTool(root, name, args, options = {}) {
   if (name === 'verify_shirudo_attestation') {
     const cleanNonce = args.nonce ? String(args.nonce).trim() : '';
     const cleanAk = args.ak_name ? String(args.ak_name).trim() : '';
+    const cleanPcr11 = args.expected_pcr11 ? String(args.expected_pcr11).trim() : '';
+    const cleanConfigRoot = args.expected_config_root ? String(args.expected_config_root).trim() : '';
     if (cleanNonce && !/^[0-9a-fA-F]{8,128}$/.test(cleanNonce)) throw new Error('Invalid nonce: expected 8-128 hex characters.');
     if (cleanAk && !/^[0-9a-zA-Z:._-]{4,128}$/.test(cleanAk)) throw new Error('Invalid ak_name: expected 4-128 alphanumeric, :, ., _, or - characters.');
     const evFile = await resolvePath(root, args.evidence_path);
-    return { name, args: { ...args, nonce: cleanNonce, ak_name: cleanAk }, file: evFile, title: args.evidence_path, reason: '' };
+    return { name, args: { ...args, nonce: cleanNonce, ak_name: cleanAk, expected_pcr11: cleanPcr11, expected_config_root: cleanConfigRoot }, file: evFile, title: args.evidence_path, reason: '' };
   }
   const file = await resolvePath(root, args.path, { directory: DIRECTORY_TOOLS.has(name), missing: name === 'write_file' });
   if (name === 'scan_secrets') return { name, args, file, title: `secrets in ${args.path}`, reason: '' };
@@ -579,6 +581,8 @@ async function executeTool(root, plan, context = {}) {
       evidencePath: plan.args.evidence_path,
       nonce: plan.args.nonce || '',
       akName: plan.args.ak_name || '',
+      expectedPcr11: plan.args.expected_pcr11 || '',
+      expectedConfigRoot: plan.args.expected_config_root || '',
       commandPath,
       ...(execFileImpl ? { execFileImpl } : {})
     });

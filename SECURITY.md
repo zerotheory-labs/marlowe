@@ -4,8 +4,8 @@
 
 | Version | Supported | Platform Status |
 | --- | --- | --- |
-| `0.4.x` | Yes | macOS (exercised); Windows & Linux (experimental / not yet host-validated) |
-| `< 0.4.0` | No | Superseded |
+| `0.6.x` | Yes | macOS (exercised); Windows & Linux (experimental / not yet host-validated) |
+| `< 0.6.0` | No | Superseded |
 
 ## Reporting a Vulnerability
 
@@ -26,11 +26,11 @@ When auditing Marlowe, distinguish enforced host boundaries from capabilities th
 
 ### Enforced Host Boundaries (Bugs Here Are Security Issues)
 - **Renderer isolation:** `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`, and CSP `connect-src 'none'`. Every IPC handler in `electron/main.cjs` validates sender frame origin and bounds input types.
-- **One-shot `ApprovalGate`:** Destructive file mutations, arbitrary shell commands, port probes, and external security scanners require an explicit user click bound to `{ runId, approvalId }`. Model prose claiming approval is rejected.
+- **One-shot `ApprovalGate`:** Destructive file mutations, arbitrary shell commands, Shirudo Beefile/BPF draft writes (`isShirudoDraftPath`), port probes, and external security scanners require an explicit user click bound to `{ runId, approvalId }`. Model prose claiming approval is rejected.
 - **`ScopeGate` & SSRF / DNS-rebinding guard (`electron/cyber-scope.cjs`):** Active HTTP, TLS, DNS, port-probe, and network scanner tools reject out-of-scope hosts and refuse targets resolving to loopback, RFC1918, link-local, or cloud-metadata (`169.254.169.254`) addresses unless explicitly authorized in `scope.json`.
-- **Workspace file confinement (`electron/agent-tools.cjs`):** Workspace file tools reject paths outside the selected workspace, symlinks (`O_NOFOLLOW`), hard links, binary files (except bounded read-only `triage_artifact`), and sensitive credential paths (`.env*`, `.git`, SSH/cloud keys).
+- **Workspace file confinement (`electron/agent-tools.cjs`, `electron/shirudo.cjs`):** Workspace file tools reject paths outside the selected workspace, symlinks (`O_NOFOLLOW`), hard links, binary files (except bounded read-only `triage_artifact`), and sensitive credential paths (`.env*`, `.git`, `.shirudo`, `shirudo-keys`, SSH/cloud keys).
 - **Credential storage & secret masking:** Provider API keys are encrypted via OS-backed Electron `safeStorage` and cleared when changing API base URL unless re-entered. `scan_secrets` and `redactSecrets` mask raw secret values before serializing tool output to the model.
-- **External CLI execution (`electron/cyber-toolchain.cjs`):** Security CLIs resolve only from verified login `PATH` directories outside the workspace and execute via `spawn(binary, argv, { shell: false })`.
+- **External CLI execution & Shirudo TPM verification (`electron/cyber-toolchain.cjs`, `electron/shirudo.cjs`):** Security CLIs resolve only from verified login `PATH` directories outside the workspace and execute via `spawn` / `execFile` with `shell: false`. `verify_shirudo_attestation` and `inspectShirudoStatus` run offline 10-rule checks (`SHIRUDO-BPF/BEE/TPM`), enforce `shirudo status --check`, and require pinned `--ak-name` / expected baselines before reporting `HOLDS UP`.
 
 ### Non-Boundaries by Design (Documented Operator Responsibility)
 - **Interactive terminal tabs (`zsh` / `bash` / `PowerShell`)** are real shells running with your OS user permissions.

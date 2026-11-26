@@ -4,7 +4,7 @@
 ![Targets](https://img.shields.io/badge/targets-Windows_11_(x64_%7C_arm64)-6ea8fe?style=flat-square&labelColor=181714)
 
 > [!WARNING]
-> **EXPERIMENTAL BUILD — NOT YET HOST-VALIDATED:** `Marlowe v0.4.0` has been exercised end-to-end on **macOS**. Windows ConPTY sessions (`PowerShell` / `cmd.exe`), DPAPI key encryption (`safeStorage`), `;`-delimited `.exe` Toolchain Doctor lookup, and all Node.js security analyzers are implemented, while `zsh`-specific prompt hooks, `otool` (macOS Mach-O only), and Windows shell process-tree cancellation have not yet been validated on a physical Windows host. Please report any platform issues on GitHub.
+> **EXPERIMENTAL BUILD — NOT YET HOST-VALIDATED:** `Marlowe v0.6.0` has been exercised end-to-end on **macOS**. Windows ConPTY sessions (`PowerShell` / `cmd.exe`), DPAPI key encryption (`safeStorage`), `;`-delimited `.exe` Toolchain Doctor lookup, and all Node.js security analyzers (including offline Beefile / `.bpf.c` / TPM JSON audits) are implemented, while `zsh`-specific prompt hooks, `otool` (macOS Mach-O only), and Windows shell process-tree cancellation have not yet been validated on a physical Windows host. Prebuilt `Marlowe-Windows-x64-v0.6.0.zip` archives are published on [GitHub Releases](https://github.com/zerotheory-labs/marlowe/releases/tag/v0.6.0). Please report any platform issues on GitHub.
 
 Marlowe shares a single cross-platform Electron + Node.js codebase at the repository root (`../electron` and `../src`). This directory contains Windows setup documentation, an optional security-CLI installer script, and the `win32` desktop packager helper.
 

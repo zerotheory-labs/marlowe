@@ -18,7 +18,7 @@
 <p>
   <a href="#10-cli-security-toolchain"><img alt="10 Local Security CLIs" src="https://img.shields.io/badge/security_CLIs-10_local_engines-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./SECURITY.md"><img alt="Renderer CSP: connect-src 'none'" src="https://img.shields.io/badge/renderer_CSP-connect--src_'none'-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
-  <a href="#validation--tests"><img alt="Tests Passing" src="https://img.shields.io/badge/tests-57_unit_%C2%B7_3_E2E_passing-3ddc97?style=flat-square&labelColor=181714" /></a>
+  <a href="#validation--tests"><img alt="Tests Passing" src="https://img.shields.io/badge/tests-60_unit_%C2%B7_3_E2E_passing-3ddc97?style=flat-square&labelColor=181714" /></a>
 </p>
 
 <p>
@@ -60,7 +60,7 @@
 > **Source-Available, Non-Commercial License:** Marlowe is licensed under the **[PolyForm Noncommercial License 1.0.0](./LICENSE)**. Personal, academic, educational, non-profit, and non-commercial security research uses are free. Commercial or workplace use requires a commercial license from **Zero Theory Labs**.
 
 > [!TIP]
-> **Using Claude Code, Cursor, Codex, or GitHub Actions?** Run **[Marlowe CI / Guard](https://github.com/zerotheory-labs/marlowe-ci)** (`v0.4.0`, [on npm](https://www.npmjs.com/package/@zerotheory-labs/marlowe-ci)) in your repo with one command for real-time Claude Code hooks, 13 read-only MCP tools, cross-file reachability, Shirudo Beefile/BPF audits, and SARIF PR checks:
+> **Using Claude Code, Cursor, Codex, or GitHub Actions?** Run **[Marlowe CI / Guard](https://github.com/zerotheory-labs/marlowe-ci)** (`v0.6.0` on GitHub, [on npm](https://www.npmjs.com/package/@zerotheory-labs/marlowe-ci)) in your repo with `npx @zerotheory-labs/marlowe-ci init --all-agents` for real-time Claude Code hooks, 13 read-only MCP tools, cross-file reachability, full 10-rule Shirudo Beefile/BPF/TPM audits (`SHIRUDO-BPF/BEE/TPM`), and SARIF PR checks:
 > ```sh
 > npx --yes @zerotheory-labs/marlowe-ci init --claude --mcp
 > ```
@@ -69,7 +69,7 @@
 
 ## Operating System Folders
 
-All platforms build from the **single shared codebase** at this repository root (`electron/` + `src/`). Pick your OS folder for native toolchain prerequisites, 9-CLI security installers, and desktop packaging scripts:
+All platforms build from the **single shared codebase** at this repository root (`electron/` + `src/`). Download prebuilt `macOS-arm64`, `Windows-x64`, and `Linux-x64` desktop archives + `SHA256SUMS` from [GitHub Releases](https://github.com/zerotheory-labs/marlowe/releases/tag/v0.6.0), or pick your OS folder for native toolchain prerequisites, 10-CLI security installers, and desktop packaging scripts:
 
 | OS Folder | Target Platforms | Validation Status | 1-Command Toolchain / Build |
 | :--- | :--- | :--- | :--- |
@@ -88,7 +88,7 @@ Requires **Node.js `22.12+`** and `npm` (plus C++ build tools to compile `node-p
 git clone https://github.com/zerotheory-labs/marlowe.git
 cd marlowe
 
-# 2. (macOS optional) Install all 9 local security CLIs + Ollama
+# 2. (macOS optional) Install the 9 Homebrew security CLIs + Ollama (add Shirudo on Linux for 10/10)
 brew bundle --file=MacOS/Brewfile
 
 # 3. Install dependencies, build the renderer, and launch Marlowe
@@ -158,7 +158,7 @@ flowchart LR
     AG["ApprovalGate (One-Shot Tokens)"]
     SG["ScopeGate + DNS/SSRF Guard"]
     FT["Workspace File Tools (O_NOFOLLOW)"]
-    TC["9-CLI Runner (shell: false)"]
+    TC["10-CLI Runner (shell: false)"]
     KS["OS Keychain (safeStorage)"]
   end
 
@@ -206,7 +206,7 @@ flowchart LR
 ## Validation & Tests
 
 ```sh
-# Run 55 Node.js unit tests (ScopeGate, SSRF guard, analyzers, findings reconciliation, agent gates)
+# Run 60 Node.js unit tests (ScopeGate, SSRF guard, analyzers, Shirudo 10-rule engine, findings reconciliation, agent gates)
 npm test
 
 # Run Playwright Electron E2E desktop suites against a local deterministic SSE server
@@ -221,7 +221,7 @@ Tests run offline in isolated temporary `userData` directories and never call pa
 
 ```text
 marlowe/
-├── MacOS/                  # macOS setup guide, 9-CLI Brewfile & .app builder (Validated)
+├── MacOS/                  # macOS setup guide, 9-CLI Brewfile (10th CLI: Linux Shirudo) & .app builder (Validated)
 ├── WindowsOS/              # Windows setup guide, winget CLI script & .exe builder (Experimental)
 ├── LinuxOS/                # Linux setup guide, distro CLI script & bundle builder (Experimental)
 ├── electron/
@@ -235,7 +235,7 @@ marlowe/
 │   ├── cyber-toolchain.cjs # Toolchain Doctor & shell:false wrappers for 10 CLIs
 │   └── findings.cjs        # Deduplicated Findings Ledger, reconciliation & SARIF v2.1.0
 ├── src/                    # Sandboxed UI, Codebase DNA, Convergence & Reachability maps
-└── test/                   # 55 unit tests (*.test.cjs) + 3 Electron E2E suites (*.e2e.cjs)
+└── test/                   # 60 unit tests (*.test.cjs) + 3 Electron E2E suites (*.e2e.cjs)
 ```
 
 ---
