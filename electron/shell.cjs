@@ -2,7 +2,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 async function shellEnvironment({ shell, env, home, userData }) {
-  const result = { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor', TERM_PROGRAM: 'Marlowe', TERM_PROGRAM_VERSION: '0.6.1' };
+  const result = { ...env, TERM: 'xterm-256color', COLORTERM: 'truecolor', TERM_PROGRAM: 'Marlowe', TERM_PROGRAM_VERSION: '0.6.2' };
   if (!Object.hasOwn(result, 'NO_COLOR')) {
     result.CLICOLOR = result.CLICOLOR || '1';
     result.LSCOLORS = result.LSCOLORS || 'exfxcxdxbxegedabagacad';
