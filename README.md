@@ -69,7 +69,7 @@
 
 ## Operating System Folders
 
-All platforms build from the **single shared codebase** at this repository root (`electron/` + `src/`). Download prebuilt `macOS-arm64`, `Windows-x64`, and `Linux-x64` desktop archives + `SHA256SUMS` from [GitHub Releases](https://github.com/zerotheory-labs/marlowe/releases/tag/v0.6.0), or pick your OS folder for native toolchain prerequisites, 10-CLI security installers, and desktop packaging scripts:
+All platforms build from the **single shared codebase** at this repository root (`electron/` + `src/`). Build or run from source across macOS, Windows, and Linux — pick your OS folder below for native toolchain prerequisites, security CLI installers, and desktop packaging scripts:
 
 | OS Folder | Target Platforms | Validation Status | 1-Command Toolchain / Build |
 | :--- | :--- | :--- | :--- |
@@ -189,7 +189,7 @@ flowchart LR
 
 <br />
 
-- **Playbook budgets:** `Engineering` runs up to `12` model rounds / `32` tool actions; `AppSec Audit`, `Authorized Recon`, and `DFIR Triage` run up to `24` rounds / `64` actions (`30 min` wall-clock cap including approval wait).
+- **Playbook budgets:** `Engineering` runs up to `24` model rounds / `64` tool actions; `AppSec Audit`, `Authorized Recon`, `DFIR Triage`, and `Shirudo Upatch` run up to `48` rounds / `128` actions (`30 min` wall-clock cap including approval wait).
 - **Clean `PATH`-only command environment:** `toolchain.cjs` extracts `PATH` once from your login shell (`zsh`/`bash`/`fish`), drops relative/missing/in-workspace paths (so agent-created files cannot shadow approved command names), and strips arbitrary environment variables and API keys.
 - **Snapshots & safe Undo:** File mutations write snapshots to `agent-backups/` in `userData`. **Undo file change** restores a file only if disk contents still match the agent's output, protecting newer manual edits.
 - **Terminal context consent:** Terminal buffer sharing is **off by default**. Checking **Attach terminal output** captures a one-shot snapshot (`16,000` chars max) with **Preview** and **Redact secrets** controls before sending.

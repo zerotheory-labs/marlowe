@@ -4,7 +4,7 @@
 ![Targets](https://img.shields.io/badge/targets-Windows_11_(x64_%7C_arm64)-6ea8fe?style=flat-square&labelColor=181714)
 
 > [!WARNING]
-> **EXPERIMENTAL BUILD — NOT YET HOST-VALIDATED:** `Marlowe v0.6.0` has been exercised end-to-end on **macOS**. Windows ConPTY sessions (`PowerShell` / `cmd.exe`), DPAPI key encryption (`safeStorage`), `;`-delimited `.exe` Toolchain Doctor lookup, and all Node.js security analyzers (including offline Beefile / `.bpf.c` / TPM JSON audits) are implemented, while `zsh`-specific prompt hooks, `otool` (macOS Mach-O only), and Windows shell process-tree cancellation have not yet been validated on a physical Windows host. Prebuilt `Marlowe-Windows-x64-v0.6.0.zip` archives are published on [GitHub Releases](https://github.com/zerotheory-labs/marlowe/releases/tag/v0.6.0). Please report any platform issues on GitHub.
+> **EXPERIMENTAL BUILD — NOT YET HOST-VALIDATED:** `Marlowe v0.6.0` has been exercised end-to-end on **macOS**. Windows ConPTY sessions (`PowerShell` / `cmd.exe`), DPAPI key encryption (`safeStorage`), `;`-delimited `.exe` Toolchain Doctor lookup, and all Node.js security analyzers (including offline Beefile / `.bpf.c` / TPM JSON audits) are implemented, while `zsh`-specific prompt hooks, `otool` (macOS Mach-O only), and Windows shell process-tree cancellation have not yet been validated on a physical Windows host. Follow the instructions below to build and test from source, and please report any platform issues on GitHub.
 
 Marlowe shares a single cross-platform Electron + Node.js codebase at the repository root (`../electron` and `../src`). This directory contains Windows setup documentation, an optional security-CLI installer script, and the `win32` desktop packager helper.
 
@@ -25,7 +25,7 @@ Marlowe shares a single cross-platform Electron + Node.js codebase at the reposi
 
 Marlowe's built-in security analyzers (**Codebase DNA**, `scan_secrets`, `audit_code_patterns`, `audit_dependencies`, `triage_artifact` including PE header detection, and `ScopeGate` HTTP/TLS/DNS/TCP) run natively in Node.js with zero external binaries.
 
-To install the external CLI engines detected by **Toolchain Doctor** (`8/8` applicable on Windows; `otool` is macOS Mach-O specific), review and run `WindowsOS\install-clis.ps1` or install individually via `winget` / `pip`:
+To install the external CLI engines detected by **Toolchain Doctor** (`8/10` applicable on Windows; `otool` is macOS Mach-O specific and `shirudo` is Linux-only), review and run `WindowsOS\install-clis.ps1` or install individually via `winget` / `pip`:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\WindowsOS\install-clis.ps1

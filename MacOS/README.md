@@ -3,7 +3,7 @@
 ![Status: VALIDATED](https://img.shields.io/badge/status-EXERCISED_%26_VALIDATED-3ddc97?style=flat-square&labelColor=181714)
 ![Targets](https://img.shields.io/badge/targets-macOS_14%2B_(arm64_%7C_x64)-3ddc97?style=flat-square&labelColor=181714)
 
-Marlowe shares a single cross-platform Electron + Node.js codebase at the repository root (`../electron` and `../src`). This directory contains macOS-specific setup, the 9-CLI Homebrew manifest (`Brewfile`, covering 9 of Toolchain Doctor's 10 engines alongside optional Linux `shirudo`), and the `.app` bundle builder. Prebuilt `Marlowe-macOS-arm64-v0.6.0.zip` archives are also published on [GitHub Releases](https://github.com/zerotheory-labs/marlowe/releases/tag/v0.6.0).
+Marlowe shares a single cross-platform Electron + Node.js codebase at the repository root (`../electron` and `../src`). This directory contains macOS-specific setup, the 9-CLI Homebrew manifest (`Brewfile`, covering 9 of Toolchain Doctor's 10 engines alongside optional Linux `shirudo`), and the `.app` bundle builder (`./MacOS/build-macos.sh`) for building and running locally from source.
 
 ---
 
