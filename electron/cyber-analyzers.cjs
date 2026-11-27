@@ -4,6 +4,7 @@ const dns = require('node:dns/promises');
 const net = require('node:net');
 const tls = require('node:tls');
 const { createHash } = require('node:crypto');
+const { scanRevision } = require('./findings.cjs');
 const { SECRET_RULES, maskToken, isPrivateOrReservedIp, assertTargetInScope, redactSecrets } = require('./cyber-scope.cjs');
 const { scanArtexEdgeSurface, analyzeAgenticBehavior } = require('./artex-defense.cjs');
 
@@ -68,7 +69,7 @@ const CODE_RULES = [
   { id: 'iac-privileged', category: 'iac', severity: 'medium', cwe: 'CWE-250', title: 'Privileged container or world-writable permissions', regex: /^\s*USER\s+root\s*$|privileged\s*:\s*true\b|hostNetwork\s*:\s*true\b|\bchmod\s+(?:-R\s+)?777\b/ }
 ];
 
-async function scanSecrets(root, startDir, { relativePath, walk, readText }, signal) {
+async function scanSecrets(root, startDir, { relativePath, walk, readText, onFileScanned }, signal) {
   const state = { truncated: false, deadline: Date.now() + 10000 };
   const findings = [];
   let scanned = 0, used = 0;
@@ -108,6 +109,7 @@ async function scanSecrets(root, startDir, { relativePath, walk, readText }, sig
         }
       }
     }
+    onFileScanned?.(rel);
   }
   return {
     scannedFiles: scanned,
@@ -118,7 +120,7 @@ async function scanSecrets(root, startDir, { relativePath, walk, readText }, sig
   };
 }
 
-async function auditCodePatterns(root, startDir, { category = '', relativePath, walk, readText }, signal) {
+async function auditCodePatterns(root, startDir, { category = '', relativePath, walk, readText, onFileScanned }, signal) {
   const wantedCategory = category.trim().toLowerCase();
   const activeRules = wantedCategory ? CODE_RULES.filter(r => r.category === wantedCategory) : CODE_RULES;
   if (!activeRules.length) throw new Error(`Unknown audit category "${category}". Use injection, xss, deserialization, crypto, config, iac, or omit for all.`);
@@ -183,6 +185,7 @@ async function auditCodePatterns(root, startDir, { category = '', relativePath, 
       matches.push(item);
     }
     cantTellReasons.push(...artexRes.cantTellReasons);
+    onFileScanned?.(rel);
   }
   return {
     scannedFiles: scanned,
@@ -251,7 +254,7 @@ function parseManifestPackages(relPath, content) {
   return found;
 }
 
-async function auditDependencies(root, startPath, { isDirectory, queryOsv = true, scope, fetchImpl = fetch, relativePath, walk, readText }, signal) {
+async function auditDependencies(root, startPath, { isDirectory, queryOsv = true, scope, fetchImpl = fetch, relativePath, walk, readText, onFileScanned }, signal) {
   const manifestNames = new Set(['package-lock.json', 'package.json', 'pnpm-lock.yaml', 'requirements.txt', 'pyproject.toml', 'go.mod', 'Cargo.lock']);
   const files = [];
   if (isDirectory) {
@@ -264,14 +267,17 @@ async function auditDependencies(root, startPath, { isDirectory, queryOsv = true
     files.push(startPath);
   }
   const seen = new Map(), manifests = [];
+  const packagesByManifest = new Map();
+  const packageKey = p => `${p.ecosystem}:${p.name}@${p.version}`;
   for (const file of files) {
     let text;
     try { text = await readText(file); } catch { continue; }
     const rel = relativePath(root, file);
     const parsed = parseManifestPackages(rel, text);
     if (parsed.length) manifests.push(rel);
+    if (onFileScanned && parsed.length) packagesByManifest.set(rel, parsed);
     for (const pkg of parsed) {
-      const key = `${pkg.ecosystem}:${pkg.name}@${pkg.version}`;
+      const key = packageKey(pkg);
       if (!seen.has(key)) seen.set(key, pkg);
     }
   }
@@ -304,6 +310,14 @@ async function auditDependencies(root, startPath, { isDirectory, queryOsv = true
         const payload = await res.json();
         osvStatus = 'queried';
         const results = Array.isArray(payload?.results) ? payload.results : [];
+        const completeBatch = results.length === batch.length && results.every(r =>
+          r && typeof r === 'object' && !Array.isArray(r) && (r.vulns === undefined || Array.isArray(r.vulns)));
+        if (onFileScanned && completeBatch) {
+          const checked = new Set(batch.map(packageKey));
+          for (const [rel, deps] of packagesByManifest) {
+            if (deps.every(p => checked.has(packageKey(p)))) onFileScanned(rel);
+          }
+        }
         for (let i = 0; i < results.length && i < batch.length; i++) {
           const vulns = results[i]?.vulns;
           if (!Array.isArray(vulns) || !vulns.length) continue;
@@ -927,7 +941,7 @@ async function reconcileWorkspaceFindings(root, findingsStore) {
   return { findings: list, mitigatedCount };
 }
 
-async function scanWorkspaceDna(root, { findings = [], tools = [], maxFiles = 260 } = {}) {
+async function scanWorkspaceDna(root, { findings = [], tools = [], scans = new Map(), maxFiles = 260 } = {}) {
   const pathMod = require('node:path');
   const readySet = new Set(tools.filter(t => t.available).map(t => t.id));
   const activeFindings = (findings || []).filter(f => f.status === 'open' || f.status === 'verified');
@@ -956,15 +970,18 @@ async function scanWorkspaceDna(root, { findings = [], tools = [], maxFiles = 26
       let handle;
       try {
         handle = await fs.open(full, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
-        const stat = await handle.stat();
-        if (!stat.isFile() || stat.nlink > 1 || stat.size > MAX_ARTIFACT_BYTES) continue;
-        const sampleLen = Math.min(stat.size, 65536);
+        const stat = await handle.stat({ bigint: true });
+        if (!stat.isFile() || stat.nlink > 1n || stat.size > MAX_ARTIFACT_BYTES) continue;
+        const size = Number(stat.size);
+        const sampleLen = Math.min(size, 65536);
         const buf = Buffer.alloc(sampleLen);
         if (sampleLen > 0) await handle.read(buf, 0, sampleLen, 0);
         const entropy = shannonEntropy(buf);
         const isBinary = buf.subarray(0, Math.min(sampleLen, 4096)).includes(0);
         const rel = pathMod.relative(root, full).split(pathMod.sep).join('/');
         const base = entry.name.toLowerCase();
+        const receipt = scans.get(rel);
+        const scannedBy = receipt?.revision === scanRevision(stat) ? receipt.scanners : [];
         const isUpatch = base === 'beefile' || /\.(?:beefile|bpf\.c|upatch\.c|bee|upatch)$/i.test(base);
         const kind = isUpatch
           ? 'upatch'
@@ -1007,11 +1024,12 @@ async function scanWorkspaceDna(root, { findings = [], tools = [], maxFiles = 26
         items.push({
           path: rel,
           group,
-          size: stat.size,
+          size,
           entropy,
           isBinary,
           kind,
-          engines: activeClis.length ? activeClis : ['built-in'],
+          engines: activeClis,
+          scannedBy,
           findingCount: fileFindings.length,
           openFindingIds: fileFindings.map(f => f.id),
           maxSeverity,
@@ -1323,10 +1341,10 @@ async function inspectSourceReachability(root, relPath, lineNum, options = {}) {
   }
 }
 
-async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {} } = {}) {
+async function buildWorkspaceGraphs(root, { findings = [], tools = [], scans = new Map(), scope = {} } = {}) {
   const pathMod = require('node:path');
   const dna = root
-    ? await scanWorkspaceDna(root, { findings, tools, maxFiles: 220 })
+    ? await scanWorkspaceDna(root, { findings, tools, scans, maxFiles: 220 })
     : { workspace: '', files: [], summary: { totalFiles: 0, peakEntropy: 0, highEntropyCount: 0, affectedFilesCount: 0, openFindingsCount: 0, hotspotCount: 0, readyEngines: [], readyCount: tools.filter(t => t.available).length, totalEngines: tools.length } };
 
   const ENGINE_ORDER = ['semgrep', 'gitleaks', 'trivy', 'osv-scanner', 'nmap', 'nuclei', 'tshark', 'radare2', 'otool', 'shirudo'];
@@ -1365,9 +1383,7 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
       ? 'crit'
       : file.findingCount > 0
         ? 'warn'
-        : (file.kind === 'binary' || file.kind === 'capture')
-          ? 'binary'
-          : 'clean';
+        : file.scannedBy.length ? 'scanned' : 'not-scanned';
     pickedAssets.push({
       id: `asset:${file.path}`,
       path: file.path,
@@ -1378,9 +1394,10 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
       status,
       findingCount: file.findingCount,
       openFindingIds: file.openFindingIds || [],
-      engineIds: allCand,
+      engineIds: [...new Set([...allCand, ...file.scannedBy.filter(id => ENGINE_ORDER.includes(id))])],
+      scannedBy: file.scannedBy,
       impactIds: [],
-      detail: `${file.path} · ${file.kind.toUpperCase()} · Entropy ${file.entropy.toFixed(2)} b/B · ${file.findingCount ? `${file.findingCount} open issue(s)` : 'Verified clean'}`
+      detail: `${file.path} · ${file.findingCount} open finding(s) · ${file.scannedBy.length ? 'Scanned by ' + file.scannedBy.join(', ') : 'Not scanned'}`
     });
   };
 
@@ -1444,9 +1461,9 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
         const imp = ensureImpact(`imp:${key}`, {
           label: `${key} · ${f.title.slice(0, 20)}${f.title.length > 20 ? '…' : ''}`,
           status: isCrit ? 'crit' : 'warn',
-          badge: `${f.severity.toUpperCase()} · ${asset.engineIds.length} CLIs`,
+          badge: f.severity.toUpperCase(),
           findingId: f.id,
-          detail: `[${f.severity.toUpperCase()}] ${f.title} at ${f.location} — corroborated across ${asset.engineIds.join(', ')}`
+          detail: `[${f.severity.toUpperCase()}] ${f.title} at ${f.location}`
         });
         if (!asset.impactIds.includes(imp.id)) asset.impactIds.push(imp.id);
       }
@@ -1458,36 +1475,12 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
         detail: 'Authorized Network Scope enforced by host process; private/metadata IPs blocked unless explicitly listed.'
       });
       asset.impactIds.push(imp.id);
-    } else if (asset.kind === 'binary' || asset.kind === 'capture') {
-      const imp = ensureImpact('imp:dfir-clean', {
-        label: 'Artifact & Mach-O Posture',
-        status: 'binary',
-        badge: 'TRIAGED · CLEAN',
-        detail: `Binary & capture telemetry mapped to otool, Radare2 & TShark (peak ${dna.summary.peakEntropy.toFixed(2)} b/B).`
-      });
-      asset.impactIds.push(imp.id);
-    } else if (asset.kind === 'upatch') {
-      const imp = ensureImpact('imp:shirudo-upatch', {
-        label: 'Shirudo Upatch · Shield Posture',
-        status: 'clean',
-        badge: 'SHIRUDO · BPF',
-        detail: 'Shirudo Beefile & eBPF upatch shields verified for scoping, license declaration, and signing hygiene.'
-      });
-      asset.impactIds.push(imp.id);
-    } else if (asset.kind === 'manifest' || asset.kind === 'iac') {
-      const imp = ensureImpact('imp:supply-clean', {
-        label: 'Supply Chain & IaC · Clean',
-        status: 'clean',
-        badge: 'OSV + TRIVY',
-        detail: 'Dependency manifests & IaC configs verified with 0 open CVE/misconfiguration findings.'
-      });
-      asset.impactIds.push(imp.id);
     } else {
-      const imp = ensureImpact('imp:sast-clean', {
-        label: 'SAST & Secrets · Clean',
-        status: 'clean',
-        badge: 'SEMGREP + GITLEAKS',
-        detail: 'Source modules verified with 0 active secret exposures or reachable injection sinks.'
+      const scanned = asset.scannedBy.length > 0;
+      const label = scanned ? 'Scanned' : 'Not scanned';
+      const imp = ensureImpact(scanned ? 'imp:scanned:' + asset.scannedBy.join(',') : 'imp:not-scanned', {
+        label, status: asset.status, badge: label,
+        detail: scanned ? 'Completed checks: ' + asset.scannedBy.join(', ') : 'No scanner results for this file revision.'
       });
       asset.impactIds.push(imp.id);
     }
@@ -1599,38 +1592,26 @@ async function buildWorkspaceGraphs(root, { findings = [], tools = [], scope = {
       },
       impact: {
         label: '0 Blast Radius',
-        sub: isFp ? 'Suppressed FP' : 'Verified Clean'
+        sub: isFp ? 'Suppressed FP' : 'Marked mitigated'
       },
       detail: `[${rf.status.toUpperCase()}] ${rf.title} (${rf.location}) — path severed and excluded from active risk score.`
     });
   }
 
-  // Fill with verified clean workspace architecture lanes if fewer than 3 lanes
-  for (const cleanFile of dna.files.filter(f => f.findingCount === 0)) {
+  for (const file of dna.files.filter(f => f.findingCount === 0)) {
     if (lanes.length >= 4) break;
-    const baseFile = pathMod.basename(cleanFile.path);
+    const scanned = file.scannedBy.length > 0;
+    const label = scanned ? 'Scanned' : 'Not scanned';
     lanes.push({
-      id: `clean:${cleanFile.path}`,
-      state: 'clean',
-      path: cleanFile.path,
-      gateLabel: '✓ GUARDED · 0 ISSUES',
-      entry: {
-        label: cleanFile.kind === 'binary' ? 'Compiled Binary' : cleanFile.kind === 'capture' ? 'Packet Capture' : cleanFile.kind === 'manifest' ? 'Pinned Manifest' : cleanFile.kind === 'iac' ? 'IaC Blueprint' : 'Workspace Module',
-        sub: `Entropy ${cleanFile.entropy.toFixed(2)} b/B`
-      },
-      handler: {
-        label: baseFile,
-        sub: cleanFile.group
-      },
-      sink: {
-        label: cleanFile.engines.slice(0, 2).join(' + '),
-        sub: `${cleanFile.kind.toUpperCase()} · Verified`
-      },
-      impact: {
-        label: '0 Active Issues',
-        sub: 'Clean Posture'
-      },
-      detail: `${cleanFile.path} (${cleanFile.kind.toUpperCase()}, ${cleanFile.entropy.toFixed(2)} b/B) — 0 active vulnerabilities across ${cleanFile.engines.join(', ')}.`
+      id: `file:${file.path}`,
+      state: scanned ? 'scanned' : 'not-scanned',
+      path: file.path,
+      gateLabel: label,
+      entry: { label: file.kind.toUpperCase(), sub: `Entropy ${file.entropy.toFixed(2)} b/B` },
+      handler: { label: pathMod.basename(file.path), sub: file.group },
+      sink: { label: scanned ? file.scannedBy.join(' + ') : label, sub: 'Scanner results' },
+      impact: { label, sub: '0 recorded findings' },
+      detail: scanned ? `${file.path} · Scanned by ${file.scannedBy.join(', ')}` : `${file.path} · Not scanned`
     });
   }
 

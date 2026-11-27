@@ -122,12 +122,14 @@ function registerHandlers() {
       resolved = await loginPath({ shell: process.env.SHELL || '/bin/zsh', root: folder, env });
       if (resolved) toolPath = Promise.resolve(resolved);
     }
-    const [doctor, reconciled] = await Promise.all([
-      detectSecurityTools(resolved, { root: folder }),
-      reconcileWorkspaceFindings(folder, findingsStore)
+    const workspace = folder;
+    const [doctor, reconciled, scans] = await Promise.all([
+      detectSecurityTools(resolved, { root: workspace }),
+      reconcileWorkspaceFindings(workspace, findingsStore),
+      findingsStore.listScans(workspace)
     ]);
     if (reconciled.mitigatedCount > 0) send('findings:changed', reconciled.findings);
-    const dna = await scanWorkspaceDna(folder, { findings: reconciled.findings, tools: doctor.tools });
+    const dna = await scanWorkspaceDna(workspace, { findings: reconciled.findings, tools: doctor.tools, scans });
     return { ...dna, autoMitigated: reconciled.mitigatedCount };
   });
   handle('cyber:graphs', async () => {
@@ -141,9 +143,12 @@ function registerHandlers() {
     if (!folderChosen) {
       return buildWorkspaceGraphs('', { findings: [], tools: doctor.tools, scope });
     }
-    const reconciled = await reconcileWorkspaceFindings(folder, findingsStore);
+    const workspace = folder;
+    const [reconciled, scans] = await Promise.all([
+      reconcileWorkspaceFindings(workspace, findingsStore), findingsStore.listScans(workspace)
+    ]);
     if (reconciled.mitigatedCount > 0) send('findings:changed', reconciled.findings);
-    return buildWorkspaceGraphs(folder, { findings: reconciled.findings, tools: doctor.tools, scope });
+    return buildWorkspaceGraphs(workspace, { findings: reconciled.findings, tools: doctor.tools, scans, scope });
   });
   handle('cyber:redact', text => {
     if (typeof text !== 'string' || text.length > 32000) throw new Error('Invalid text for secret redaction.');
@@ -367,7 +372,9 @@ async function migrateLegacyData() {
 }
 app.whenReady().then(async () => {
   await migrateLegacyData();
-  findingsStore = createFindingsStore(dataFile('findings'));
+  findingsStore = createFindingsStore(dataFile('findings'), workspace => {
+    if (folder === workspace) send('scans:changed');
+  });
   settings = await readJson('settings.json', defaults);
   try { validateSettings(settings); } catch { settings = defaults; }
   try { scope = validateScopeConfig(await readJson('scope.json', DEFAULT_SCOPE)); } catch { scope = { ...DEFAULT_SCOPE }; }

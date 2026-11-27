@@ -37,6 +37,8 @@ function fitText(str, max) {
 }
 
 function colorForStatus(status, c) {
+  if (status === 'not-scanned') return c.mute;
+  if (status === 'scanned') return c.info;
   if (status === 'crit') return c.crit;
   if (status === 'warn') return c.warn;
   if (status === 'binary' || status === 'scope') return c.info;
@@ -62,6 +64,7 @@ export function setupStageGraphs(api, {
   let selectedConvId = null;
   let selectedLaneId = null;
   let loading = false;
+  let refreshPending = false;
 
   const views = new Map();
 
@@ -106,7 +109,7 @@ export function setupStageGraphs(api, {
     const inspector = el('div', 'stage-graph-inspector');
     const inspInfo = el('div', 'stage-insp-info');
     const inspBadge = el('span', 'zt-tag green', 'READY');
-    const inspText = el('span', 'stage-insp-text', 'Hover or click any node to inspect multi-engine corroboration and blast radius.');
+    const inspText = el('span', 'stage-insp-text', 'Select a node to inspect scanner results and recorded findings.');
     inspInfo.append(inspBadge, inspText);
     const inspActions = el('div', 'stage-insp-actions');
     inspector.append(inspInfo, inspActions);
@@ -123,7 +126,7 @@ export function setupStageGraphs(api, {
     'convergence',
     '10-CLI Convergence',
     '10-CLI Security Convergence',
-    'Installed local security engines → live workspace & scope assets → corroborated CWE / artifact posture.'
+    'Local security tools, their applicable files, and recorded scan results.'
   );
   createGraphTab(
     'reachability',
@@ -185,7 +188,7 @@ export function setupStageGraphs(api, {
     for (const [label, x] of [
       [`01 · LOCAL CLIs (${s.readyCount}/${s.totalEngines} READY)`, 24],
       ['02 · LIVE WORKSPACE & SCOPE ASSETS', 300],
-      ['03 · CORROBORATED POSTURE', 612]
+      ['03 · RECORDED RESULTS', 612]
     ]) {
       view.svg.append(svgEl('text', {
         x, y: 22, fill: c.mute, 'font-size': '10', 'letter-spacing': '1.2', 'font-weight': '500'
@@ -234,7 +237,7 @@ export function setupStageGraphs(api, {
           fill: 'none',
           stroke: e.available ? col : c.line,
           'stroke-width': active && selectedConvId ? '2.1' : '1.45',
-          'stroke-dasharray': e.available ? 'none' : '4 4',
+          'stroke-dasharray': a.scannedBy?.includes(engId) ? 'none' : '4 4',
           'stroke-opacity': active ? (e.available ? '0.62' : '0.28') : '0.1'
         }));
       }
@@ -272,7 +275,7 @@ export function setupStageGraphs(api, {
       setInspector(view, {
         badge: e.available ? 'CLI READY' : 'MISSING',
         tagTone: e.available ? 'green' : 'sand',
-        text: `${e.label}${e.version ? ` (${e.version})` : ''} · ${e.category} · Covers ${covered.length} mapped workspace/scope asset(s).`,
+        text: `${e.label}${e.version ? ` (${e.version})` : ''} · ${e.category} · Applicable to ${covered.length} mapped asset(s).`,
         actions: [scopeBtn]
       });
     };
@@ -304,8 +307,8 @@ export function setupStageGraphs(api, {
       btns.push(dnaBtn);
 
       setInspector(view, {
-        badge: a.findingCount > 0 ? `${a.findingCount} OPEN` : a.kind === 'scope' ? 'IN SCOPE' : 'CLEAN',
-        tagTone: a.status === 'crit' ? 'rose' : a.status === 'warn' ? 'sand' : a.status === 'binary' || a.status === 'scope' ? 'sky' : 'green',
+        badge: a.findingCount > 0 ? `${a.findingCount} OPEN` : a.kind === 'scope' ? 'IN SCOPE' : a.scannedBy?.length ? 'Scanned' : 'Not scanned',
+        tagTone: a.status === 'crit' ? 'rose' : a.status === 'warn' ? 'sand' : a.status === 'not-scanned' ? 'muted' : 'sky',
         text: a.detail,
         actions: btns
       });
@@ -321,7 +324,7 @@ export function setupStageGraphs(api, {
       }
       setInspector(view, {
         badge: imp.badge,
-        tagTone: imp.status === 'crit' ? 'rose' : imp.status === 'warn' ? 'sand' : imp.status === 'binary' || imp.status === 'scope' ? 'sky' : 'green',
+        tagTone: imp.status === 'crit' ? 'rose' : imp.status === 'warn' ? 'sand' : imp.status === 'not-scanned' ? 'muted' : 'sky',
         text: imp.detail,
         actions: btns
       });
@@ -490,14 +493,14 @@ export function setupStageGraphs(api, {
         btns.push(auditBtn);
       }
 
-      const tone = lane.state === 'reachable' ? 'rose' : lane.state === 'unverified' ? 'sand' : 'green';
+      const tone = lane.state === 'reachable' ? 'rose' : lane.state === 'unverified' ? 'sand' : lane.state === 'not-scanned' ? 'muted' : 'sky';
       const badge = lane.state === 'reachable'
         ? 'REACHABLE PATH'
         : lane.state === 'unverified'
           ? 'UNVERIFIED SINK'
           : lane.state === 'severed'
             ? 'PATH SEVERED'
-            : 'GUARDED';
+            : lane.gateLabel;
       setInspector(view, { badge, tagTone: tone, text: lane.detail, actions: btns });
     };
 
@@ -509,7 +512,7 @@ export function setupStageGraphs(api, {
         ? c.crit
         : lane.state === 'unverified'
           ? c.warn
-          : c.signal;
+          : colorForStatus(lane.state, c);
       const connCol = lane.state === 'severed' ? c.mute : strokeCol;
       const dashed = lane.state === 'severed' || lane.state === 'unverified' ? '4 4' : 'none';
 
@@ -583,7 +586,7 @@ export function setupStageGraphs(api, {
   }
 
   async function refresh(manual = false) {
-    if (loading) return;
+    if (loading) { refreshPending = true; return; }
     loading = true;
     for (const v of views.values()) {
       v.rescanBtn.disabled = true;
@@ -601,6 +604,10 @@ export function setupStageGraphs(api, {
       for (const v of views.values()) {
         v.rescanBtn.disabled = false;
         v.rescanBtn.textContent = 'Rescan';
+      }
+      if (refreshPending) {
+        refreshPending = false;
+        if (activeGraph) await refresh();
       }
     }
   }

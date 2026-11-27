@@ -14,7 +14,7 @@ const {
   triageArtifact, extractIocs, analyzeLogs, reconcileWorkspaceFindings
 } = require('./cyber-analyzers.cjs');
 const { prepareScannerSpec, executeScannerRun } = require('./cyber-toolchain.cjs');
-const { normalizeFinding } = require('./findings.cjs');
+const { normalizeFinding, scanRevision } = require('./findings.cjs');
 const { isShirudoDraftPath, inspectShirudoTarget, verifyShirudoAttestation } = require('./shirudo.cjs');
 
 const MAX_FILE = 200000;
@@ -166,15 +166,20 @@ async function resolvePath(root, relative, { directory = false, missing = false,
   }
   return target;
 }
-async function readText(file, missing = false) {
+async function readText(file, missing = false, onReadRevision) {
   let handle;
   try {
     handle = await fs.open(file, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
-    const stat = await handle.stat();
-    if (!stat.isFile() || stat.nlink > 1 || stat.size > MAX_FILE) throw new Error('Use a regular text file of at most 200 KB, without hard links.');
+    const stat = await handle.stat({ bigint: true });
+    if (!stat.isFile() || stat.nlink > 1n || stat.size > MAX_FILE) throw new Error('Use a regular text file of at most 200 KB, without hard links.');
     const data = await handle.readFile();
     if (data.includes(0)) throw new Error('Binary files are not supported.');
-    return new TextDecoder('utf-8', { fatal: true }).decode(data);
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(data);
+    if (onReadRevision) {
+      const revision = scanRevision(stat);
+      if (scanRevision(await handle.stat({ bigint: true })) === revision) onReadRevision(revision);
+    }
+    return text;
   } catch (error) { if (missing && error.code === 'ENOENT') return null; throw error; }
   finally { await handle?.close(); }
 }
@@ -497,7 +502,58 @@ async function prepareTool(root, name, args, options = {}) {
   return { name, args, file, before, after, reason, title: args.path, diff: lineDiff(before, after), preview: `--- Before: ${args.path}\n${before ?? '(new file)'}\n\n+++ After: ${args.path}\n${after ?? '(deleted)'}` };
 }
 
+async function runTextScan(root, plan, { signal, scope = DEFAULT_SCOPE, fetchImpl, findingsStore }) {
+  const revisions = new Map();
+  const completed = new Map();
+  const readForScan = file => readText(file, false, version => revisions.set(relativePath(root, file), version));
+  const access = { relativePath, walk, readText };
+  if (findingsStore?.recordScans) {
+    access.readText = readForScan;
+    access.onFileScanned = rel => {
+      if (revisions.has(rel)) completed.set(rel, revisions.get(rel));
+    };
+  }
+  let result;
+  if (plan.name === 'audit_dependencies') {
+    const file = await resolvePath(root, plan.args.path, { any: true });
+    result = await auditDependencies(root, file, {
+      ...access, isDirectory: (await fs.lstat(file)).isDirectory(), queryOsv: plan.args.query_osv !== false, scope, fetchImpl
+    }, signal);
+  } else {
+    const dir = await resolvePath(root, plan.args.path, { directory: true });
+    result = plan.name === 'scan_secrets'
+      ? await scanSecrets(root, dir, access, signal)
+      : await auditCodePatterns(root, dir, { ...access, category: plan.args.category }, signal);
+  }
+  if (completed.size) await findingsStore.recordScans(root, plan.name, completed);
+  return result;
+}
+
+// External scanners and artifact tools name their inspected files in the result.
+// A directory target alone is never evidence that every descendant was scanned.
+async function recordReportedFiles(root, target, scanner, paths, startedAt, store) {
+  if (!store?.recordScans || !paths.length) return;
+  const revisions = new Map();
+  for (const reported of new Set(paths)) {
+    if (typeof reported !== 'string' || !reported) continue;
+    let full = path.resolve(root, reported);
+    // Trivy filesystem reports name targets relative to the directory it inspected.
+    if (scanner === 'trivy' && !path.isAbsolute(reported) && !contained(target, full)) full = path.resolve(target, reported);
+    if (!contained(target, full)) continue;
+    const rel = relativePath(root, full);
+    try {
+      const safe = await resolvePath(root, rel);
+      const stat = await fs.lstat(safe, { bigint: true });
+      if (stat.isFile() && stat.nlink === 1n && stat.ctimeNs < startedAt && stat.mtimeNs < startedAt) {
+        revisions.set(rel, scanRevision(stat));
+      }
+    } catch { /* Deleted, restricted or replaced while the scanner was running. */ }
+  }
+  if (revisions.size) await store.recordScans(root, scanner, revisions);
+}
+
 async function executeTool(root, plan, context = {}) {
+  const startedAt = BigInt(Date.now()) * 1_000_000n;
   const { signal, backupDir, onOutput, commandPath, scope = DEFAULT_SCOPE, findingsStore, onFinding, playbook, runId, fetchImpl, dnsLookup, dnsResolver, tlsConnect, netConnect, spawnImpl, execFileImpl } = context;
   signal.throwIfAborted();
   if (plan.name === 'run_command') {
@@ -517,8 +573,11 @@ async function executeTool(root, plan, context = {}) {
     return probePorts(plan.args.target, { ports: plan.args.ports, timeoutMs: plan.args.timeout_ms, scope, dnsLookup, netConnect }, signal);
   }
   if (plan.name === 'run_security_scanner') {
-    if (!plan.scannerPlan.isNetwork) await resolvePath(root, plan.args.target, { any: true });
-    return executeScannerRun(plan, { root, scope, commandPath, signal, onOutput, dnsLookup, spawnImpl });
+    const target = plan.scannerPlan.isNetwork ? null : await resolvePath(root, plan.args.target, { any: true });
+    return executeScannerRun(plan, { root, scope, commandPath, signal, onOutput, dnsLookup, spawnImpl,
+      onScannedFiles: target && findingsStore
+        ? paths => recordReportedFiles(root, target, plan.scannerPlan.spec.id, paths, startedAt, findingsStore)
+        : undefined });
   }
   if (plan.name === 'record_finding') {
     if (!findingsStore) return { recorded: true, finding: plan.normalized, summary: `Recorded ${plan.normalized.severity.toUpperCase()} finding: ${plan.normalized.title}.` };
@@ -573,7 +632,9 @@ async function executeTool(root, plan, context = {}) {
     };
   }
   if (plan.name === 'audit_shirudo_upatch') {
-    return inspectShirudoTarget(root, plan.args.path, signal);
+    const result = await inspectShirudoTarget(root, plan.args.path, signal);
+    await recordReportedFiles(root, path.resolve(root, plan.args.path), plan.name, result.inspectedFiles.map(f => f.path), startedAt, findingsStore);
+    return result;
   }
   if (plan.name === 'verify_shirudo_attestation') {
     return verifyShirudoAttestation({
@@ -587,17 +648,15 @@ async function executeTool(root, plan, context = {}) {
       ...(execFileImpl ? { execFileImpl } : {})
     });
   }
-  if (plan.name === 'audit_dependencies') {
-    const file = await resolvePath(root, plan.args.path, { any: true });
-    const stat = await fs.lstat(file);
-    return auditDependencies(root, file, { isDirectory: stat.isDirectory(), queryOsv: plan.args.query_osv !== false, scope, fetchImpl, relativePath, walk, readText }, signal);
-  }
+  if (['scan_secrets', 'audit_code_patterns', 'audit_dependencies'].includes(plan.name)) return runTextScan(root, plan, context);
   const file = await resolvePath(root, plan.args.path, { directory: DIRECTORY_TOOLS.has(plan.name), missing: plan.name === 'write_file' });
-  if (plan.name === 'scan_secrets') return scanSecrets(root, file, { relativePath, walk, readText }, signal);
-  if (plan.name === 'audit_code_patterns') return auditCodePatterns(root, file, { category: plan.args.category, relativePath, walk, readText }, signal);
-  if (plan.name === 'triage_artifact') return triageArtifact(file, relativePath(root, file), signal);
-  if (plan.name === 'extract_iocs') return extractIocs(file, relativePath(root, file), signal);
-  if (plan.name === 'analyze_logs') return analyzeLogs(file, relativePath(root, file), { filter: plan.args.filter }, signal);
+  if (['triage_artifact', 'extract_iocs', 'analyze_logs'].includes(plan.name)) {
+    const rel = relativePath(root, file);
+    const inspect = { triage_artifact: triageArtifact, extract_iocs: extractIocs, analyze_logs: analyzeLogs }[plan.name];
+    const result = plan.name === 'analyze_logs' ? await inspect(file, rel, { filter: plan.args.filter }, signal) : await inspect(file, rel, signal);
+    await recordReportedFiles(root, file, plan.name, [rel], startedAt, findingsStore);
+    return result;
+  }
   if (plan.name === 'read_file') return { path: plan.args.path, ...selectLines(await readText(file), plan.args.start_line, plan.args.line_count) };
   if (plan.name === 'find_files') return findFiles(root, file, plan.args, signal);
   if (plan.name === 'search_text') return searchText(root, file, plan.args, signal);

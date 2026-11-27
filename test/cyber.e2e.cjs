@@ -140,6 +140,16 @@ test('cybersecurity scope gate, toolchain doctor, appsec playbook, secret maskin
   expect(JSON.parse(await fs.readFile(path.join(dataDir, 'workspace.json'), 'utf8')).folder).toBe(realRoot);
   await page.locator('#playbook-select').selectOption('appsec');
 
+  // Opening a workspace and detecting installed tools must not give it a clean bill of health.
+  await page.locator('#dna-button').click();
+  await expect(page.locator('#dna-inspector .zt-tag')).toHaveText('Not scanned');
+  await page.locator('#convergence-tab').click();
+  await expect(page.locator('#convergence-stage svg')).toContainText('Not scanned');
+  await page.locator('#reachability-tab').click();
+  await expect(page.locator('#reachability-stage svg')).toContainText('Not scanned');
+  await page.getByRole('tab', { name: 'Marlowe', exact: true }).click();
+  await page.locator('#assistant-tab').click();
+
   // Run AppSec audit
   await page.locator('#prompt').fill('Audit this project for secrets and SQL injection');
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
@@ -178,6 +188,7 @@ test('cybersecurity scope gate, toolchain doctor, appsec playbook, secret maskin
   await expect(page.locator('#dna-svg .dna-dot-node')).toHaveCount(7);
   await expect(page.locator('#dna-inspector')).toContainText('src/db.js');
   await expect(page.locator('#dna-inspector')).toContainText('CRITICAL');
+  await expect(page.locator('#dna-inspector .dna-engines-row')).toContainText('scan_secrets');
   await page.screenshot({ path: 'test-results/marlowe-dna.png', scale: 'css' });
 
   // Inspect 10-CLI Convergence & Attack Reachability tabs alongside Marlowe in the main stage

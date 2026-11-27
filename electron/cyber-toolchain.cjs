@@ -321,7 +321,24 @@ function prepareScannerSpec(args, { scope }) {
   return { spec, profile, isNetwork: false, targetValue: rawTarget, argv };
 }
 
-async function executeScannerRun(plan, { root, scope, commandPath = '', signal, onOutput = () => {}, dnsLookup, spawnImpl = spawn }) {
+function reportedScanPaths(scanner, stdout, exitCode) {
+  // Gitleaks and OSV use exit 1 for findings. Never infer coverage from an exit code alone.
+  if (exitCode !== 0 && !(exitCode === 1 && ['gitleaks', 'osv-scanner'].includes(scanner))) return [];
+  try {
+    const report = JSON.parse(stdout);
+    switch (scanner) {
+      case 'semgrep':
+        if (!Array.isArray(report.results) || report.errors?.length) return [];
+        return [...(Array.isArray(report.paths?.scanned) ? report.paths.scanned : []), ...report.results.map(hit => hit.path)];
+      case 'trivy': return report.Results.map(result => result.Target);
+      case 'osv-scanner': return report.results.map(result => result.source?.path);
+      case 'gitleaks': return report.map(leak => leak.File);
+      default: return [];
+    }
+  } catch { return []; }
+}
+
+async function executeScannerRun(plan, { root, scope, commandPath = '', signal, onOutput = () => {}, dnsLookup, spawnImpl = spawn, onScannedFiles }) {
   signal.throwIfAborted();
   const { spec, profile, isNetwork, targetValue, argv } = plan.scannerPlan;
   if (isNetwork) {
@@ -333,7 +350,8 @@ async function executeScannerRun(plan, { root, scope, commandPath = '', signal, 
   }
   const safeDirs = await safeSearchDirs(commandPath, root);
   const seconds = plan.seconds || 120;
-  return new Promise((resolve, reject) => {
+  let stdout = '', truncated = false;
+  const result = await new Promise((resolve, reject) => {
     let raw = '', stopped = '';
     const child = spawnImpl(binaryPath, argv, {
       cwd: root,
@@ -355,7 +373,15 @@ async function executeScannerRun(plan, { root, scope, commandPath = '', signal, 
       if (raw.length < 512000) raw += text;
       onOutput(redactSecrets(text.slice(0, 4000)).text);
     };
-    child.stdout?.on('data', consume);
+    child.stdout?.setEncoding?.('utf8');
+    child.stdout?.on('data', chunk => {
+      if (onScannedFiles && !truncated) {
+        const text = chunk.toString();
+        truncated = stdout.length + text.length > 512000;
+        if (!truncated) stdout += text;
+      }
+      consume(chunk);
+    });
     child.stderr?.on('data', consume);
     const cleanup = () => { clearTimeout(timer); signal.removeEventListener('abort', onAbort); };
     child.once('error', err => { cleanup(); reject(err); });
@@ -382,6 +408,10 @@ async function executeScannerRun(plan, { root, scope, commandPath = '', signal, 
     });
     if (signal.aborted) onAbort();
   });
+  if (onScannedFiles && !truncated && !result.stopped && !result.signal) {
+    await onScannedFiles(reportedScanPaths(spec.id, stdout, result.exitCode));
+  }
+  return result;
 }
 
 module.exports = {

@@ -1296,6 +1296,10 @@ async function boot() {
     onFindingsMutated: () => cyber.syncFindings()
   });
   api.onFindingsChanged(() => stageGraphs?.refreshIfVisible());
+  api.onScansChanged(() => {
+    stageGraphs?.refreshIfVisible();
+    if (activeRightTab === 'dna') cyber.refreshDna();
+  });
   activate(shellId);
 }
 boot().catch(error => { $('app-status').textContent = 'Startup needs attention'; notify(errorMessage(error)); });
