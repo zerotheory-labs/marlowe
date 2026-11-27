@@ -9,7 +9,7 @@
 </p>
 
 <p>
-  <a href="https://github.com/zerotheory-labs/marlowe/releases/tag/v0.6.0"><img alt="Release v0.6.0" src="https://img.shields.io/badge/release-v0.6.0-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
+  <a href="https://github.com/zerotheory-labs/marlowe/releases/tag/v0.6.1"><img alt="Release v0.6.1" src="https://img.shields.io/badge/release-v0.6.1-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./LICENSE"><img alt="License: PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/license-PolyForm_Noncommercial_1.0.0-e5c07b?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./MacOS"><img alt="macOS Validated" src="https://img.shields.io/badge/macOS-validated_(arm64_%7C_x64)-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./WindowsOS"><img alt="Windows & Linux Experimental" src="https://img.shields.io/badge/Windows_%26_Linux-experimental-6ea8fe?style=flat-square&labelColor=181714" /></a>
@@ -37,7 +37,7 @@
 
 ---
 
-**Marlowe.** (`v0.6.0`, by **[Zero Theory Labs](https://github.com/zerotheory-labs)**) is a source-available desktop terminal and cybersecurity workbench. It pairs real interactive shells (`node-pty` + `xterm.js`) with a taint-verifying security agent, **Codebase DNA** entropy mapping, **10-CLI Security Convergence** & **Cross-File Attack Reachability** graphs, **Shirudo Upatch** drafting + TPM 2.0 attestation verification, host-enforced **Approve once** gates, `ScopeGate` SSRF confinement, and **SARIF v2.1.0** finding ledgers.
+**Marlowe.** (`v0.6.1`, by **[Zero Theory Labs](https://github.com/zerotheory-labs)**) is a source-available desktop terminal and cybersecurity workbench. It pairs real interactive shells (`node-pty` + `xterm.js`) with a taint-verifying security agent, **Codebase DNA** entropy mapping, **10-CLI Security Convergence** & **Cross-File Attack Reachability** graphs, **Shirudo Upatch** drafting + TPM 2.0 attestation verification, host-enforced **Approve once** gates, `ScopeGate` SSRF confinement, and **SARIF v2.1.0** finding ledgers.
 
 <p align="center">
   <img src="./docs/assets/hero-convergence.png" alt="Marlowe — 10-CLI Security Convergence alongside Codebase DNA" width="100%" />
@@ -60,7 +60,7 @@
 > **Source-Available, Non-Commercial License:** Marlowe is licensed under the **[PolyForm Noncommercial License 1.0.0](./LICENSE)**. Personal, academic, educational, non-profit, and non-commercial security research uses are free. Commercial or workplace use requires a commercial license from **Zero Theory Labs**.
 
 > [!TIP]
-> **Using Claude Code, Cursor, Codex, or GitHub Actions?** Run **[Marlowe CI / Guard](https://github.com/zerotheory-labs/marlowe-ci)** (`v0.6.0` on GitHub, [on npm](https://www.npmjs.com/package/@zerotheory-labs/marlowe-ci)) in your repo with `npx @zerotheory-labs/marlowe-ci init --all-agents` for real-time Claude Code hooks, 13 read-only MCP tools, cross-file reachability, full 10-rule Shirudo Beefile/BPF/TPM audits (`SHIRUDO-BPF/BEE/TPM`), and SARIF PR checks:
+> **Using Claude Code, Cursor, Codex, or GitHub Actions?** Run **[Marlowe CI / Guard](https://github.com/zerotheory-labs/marlowe-ci)** (`v0.6.1` on GitHub, [on npm](https://www.npmjs.com/package/@zerotheory-labs/marlowe-ci)) in your repo with `npx @zerotheory-labs/marlowe-ci init --all-agents` for real-time Claude Code hooks, 13 read-only MCP tools, cross-file reachability, full 10-rule Shirudo Beefile/BPF/TPM audits (`SHIRUDO-BPF/BEE/TPM`), and SARIF PR checks:
 > ```sh
 > npx --yes @zerotheory-labs/marlowe-ci init --claude --mcp
 > ```
