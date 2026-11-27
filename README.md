@@ -18,7 +18,7 @@
 <p>
   <a href="#10-cli-security-toolchain"><img alt="10 Local Security CLIs" src="https://img.shields.io/badge/security_CLIs-10_local_engines-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
   <a href="./SECURITY.md"><img alt="Renderer CSP: connect-src 'none'" src="https://img.shields.io/badge/renderer_CSP-connect--src_'none'-3ddc97?style=flat-square&labelColor=181714" /></a>&nbsp;&nbsp;
-  <a href="#validation--tests"><img alt="Tests Passing" src="https://img.shields.io/badge/tests-60_unit_%C2%B7_3_E2E_passing-3ddc97?style=flat-square&labelColor=181714" /></a>
+  <a href="#validation--tests"><img alt="Tests Passing" src="https://img.shields.io/badge/tests-61_unit_%C2%B7_3_E2E_passing-3ddc97?style=flat-square&labelColor=181714" /></a>
 </p>
 
 <p>
@@ -206,7 +206,7 @@ flowchart LR
 ## Validation & Tests
 
 ```sh
-# Run 60 Node.js unit tests (ScopeGate, SSRF guard, analyzers, Shirudo 10-rule engine, findings reconciliation, agent gates)
+# Run 61 Node.js unit tests (ScopeGate, SSRF guard, analyzers, Shirudo 10-rule engine, ARTEX edge/behavioral pack, findings reconciliation, agent gates)
 npm test
 
 # Run Playwright Electron E2E desktop suites against a local deterministic SSE server
@@ -235,7 +235,7 @@ marlowe/
 │   ├── cyber-toolchain.cjs # Toolchain Doctor & shell:false wrappers for 10 CLIs
 │   └── findings.cjs        # Deduplicated Findings Ledger, reconciliation & SARIF v2.1.0
 ├── src/                    # Sandboxed UI, Codebase DNA, Convergence & Reachability maps
-└── test/                   # 60 unit tests (*.test.cjs) + 3 Electron E2E suites (*.e2e.cjs)
+└── test/                   # 61 unit tests (*.test.cjs) + 3 Electron E2E suites (*.e2e.cjs)
 ```
 
 ---

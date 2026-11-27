@@ -5,6 +5,7 @@ const net = require('node:net');
 const tls = require('node:tls');
 const { createHash } = require('node:crypto');
 const { SECRET_RULES, maskToken, isPrivateOrReservedIp, assertTargetInScope, redactSecrets } = require('./cyber-scope.cjs');
+const { scanArtexEdgeSurface, analyzeAgenticBehavior } = require('./artex-defense.cjs');
 
 const MAX_ARTIFACT_BYTES = 10 * 1024 * 1024;
 const RESULT_BUDGET = 22000;
@@ -123,10 +124,16 @@ async function auditCodePatterns(root, startDir, { category = '', relativePath, 
   if (!activeRules.length) throw new Error(`Unknown audit category "${category}". Use injection, xss, deserialization, crypto, config, iac, or omit for all.`);
   const state = { truncated: false, deadline: Date.now() + 10000 };
   const matches = [];
+  const cantTellReasons = [];
   let scanned = 0, used = 0;
   scan: for await (const file of walk(startDir, signal, state)) {
     signal.throwIfAborted();
     const rel = relativePath(root, file);
+    if (/\.(?:[cm]?js)\.map$/i.test(rel)) {
+      const mapArtex = scanArtexEdgeSurface(rel, '');
+      cantTellReasons.push(...mapArtex.cantTellReasons);
+      continue;
+    }
     if (/\.(?:md|txt|lock|svg|css|map)$/i.test(rel)) continue;
     if (++scanned > 4000) { state.truncated = true; break; }
     let text;
@@ -142,13 +149,33 @@ async function auditCodePatterns(root, startDir, { category = '', relativePath, 
         matches.push(item);
       }
     }
+    const artexRes = scanArtexEdgeSurface(rel, text);
+    for (const f of artexRes.findings) {
+      if (wantedCategory && f.category !== wantedCategory && !(f.ruleId === 'ARTEX-EDGE-002' && wantedCategory === 'appsec')) continue;
+      const item = {
+        path: rel,
+        line: Number(String(f.location || '').split(':')[1] || 1),
+        ruleId: f.ruleId,
+        category: f.category,
+        severity: f.severity,
+        cwe: f.cwe,
+        title: f.title,
+        verificationRequired: false,
+        reachability: f.reachability,
+        snippet: redactSecrets(String(f.evidence || '').slice(0, 220)).text
+      };
+      if (matches.length >= 160 || (used += JSON.stringify(item).length) > RESULT_BUDGET) { state.truncated = true; break scan; }
+      matches.push(item);
+    }
+    cantTellReasons.push(...artexRes.cantTellReasons);
   }
   return {
     scannedFiles: scanned,
     findingsCount: matches.length,
     truncated: state.truncated,
     matches,
-    summary: matches.length ? `Flagged ${matches.length} UNVERIFIED sink candidate${matches.length === 1 ? '' : 's'} across ${scanned} files (NOT confirmed vulnerabilities). You MUST call read_file and prove untrusted external/user input reaches a sink before recording—never record static UI templates or hardcoded demo strings.` : `No dangerous code/config patterns flagged across ${scanned} files.`
+    ...(cantTellReasons.length ? { cantTellReasons } : {}),
+    summary: matches.length ? `Flagged ${matches.length} sink/exposure candidate${matches.length === 1 ? '' : 's'} across ${scanned} files. Verify unverified CODE_RULES sinks via read_file before recording; ARTEX-EDGE findings represent exposed recon/auth surfaces.` : `No dangerous code/config patterns flagged across ${scanned} files.`
   };
 }
 
@@ -684,7 +711,7 @@ async function analyzeLogs(file, relPath, { filter = '' }, signal) {
   const text = buf.toString('utf8');
   const lines = text.split(/\r?\n/);
   const needle = filter.trim().toLowerCase();
-  const ipCounts = new Map(), statusCounts = {}, sigCounts = {}, alerts = [];
+  const ipCounts = new Map(), statusCounts = {}, sigCounts = {}, alerts = [], analyzedLineEntries = [];
   let matchedLines = 0, jsonLines = 0;
   for (let i = 0; i < lines.length; i++) {
     if ((i & 2047) === 0) signal.throwIfAborted();
@@ -692,6 +719,7 @@ async function analyzeLogs(file, relPath, { filter = '' }, signal) {
     if (!line) continue;
     if (needle && !line.toLowerCase().includes(needle)) continue;
     matchedLines++;
+    analyzedLineEntries.push({ line: i + 1, text: line });
     if (line.startsWith('{') && line.endsWith('}')) jsonLines++;
     const ipMatch = /\b(?:\d{1,3}\.){3}\d{1,3}\b/.exec(line);
     if (ipMatch && net.isIP(ipMatch[0]) === 4) ipCounts.set(ipMatch[0], (ipCounts.get(ipMatch[0]) || 0) + 1);
@@ -711,6 +739,18 @@ async function analyzeLogs(file, relPath, { filter = '' }, signal) {
       }
     }
   }
+  const agenticBehavior = analyzeAgenticBehavior(analyzedLineEntries, relPath);
+  if (agenticBehavior.detected) {
+    sigCounts['artex-agentic-behavior'] = agenticBehavior.indicators.length;
+    alerts.unshift({
+      line: agenticBehavior.indicators[0]?.line || 1,
+      type: 'artex-agentic-behavior',
+      ruleId: agenticBehavior.ruleId,
+      label: 'Agentic Machine-Speed Attack Behavior (ARTEX-style)',
+      mitre: agenticBehavior.mitre,
+      sample: redactSecrets(agenticBehavior.indicators.map(x => x.summary).join(' | ').slice(0, 240)).text
+    });
+  }
   const topIps = [...ipCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([ip, count]) => ({ ip, count, private: isPrivateOrReservedIp(ip) }));
   return {
     path: relPath,
@@ -721,7 +761,8 @@ async function analyzeLogs(file, relPath, { filter = '' }, signal) {
     signatureCounts: sigCounts,
     topSourceIps: topIps,
     alerts,
-    summary: `Analyzed ${matchedLines} log line(s) in ${relPath}: ${alerts.length} suspicious event sample(s) across ${Object.keys(sigCounts).length} detection signature(s).`
+    agenticBehavior,
+    summary: `Analyzed ${matchedLines} log line(s) in ${relPath}: ${alerts.length} suspicious event sample(s) across ${Object.keys(sigCounts).length} detection signature(s)${agenticBehavior.detected ? ` [ARTEX-BEHAV-001 ${agenticBehavior.confidence} confidence]` : ''}.`
   };
 }
 

@@ -7,7 +7,7 @@ const { EventEmitter } = require('node:events');
 const { validateScopeConfig, assertTargetInScope, isPrivateOrReservedIp, redactSecrets } = require('../electron/cyber-scope.cjs');
 const { prepareTool, executeTool, toolsForPlaybook } = require('../electron/agent-tools.cjs');
 const { detectSecurityTools } = require('../electron/cyber-toolchain.cjs');
-const { scanWorkspaceDna, reconcileWorkspaceFindings, buildWorkspaceGraphs } = require('../electron/cyber-analyzers.cjs');
+const { scanWorkspaceDna, reconcileWorkspaceFindings, buildWorkspaceGraphs, auditCodePatterns, analyzeLogs } = require('../electron/cyber-analyzers.cjs');
 const { createFindingsStore, toMarkdownReport, toSarifReport } = require('../electron/findings.cjs');
 const { auditBeefile, auditBpfUpatchSource, auditShirudoCommands, auditShirudoEvidenceJson, inspectShirudoStatus } = require('../electron/shirudo.cjs');
 const { runAgent } = require('../electron/agent.cjs');
@@ -721,3 +721,45 @@ test('SHIRUDO-TPM-001..003 catch workflow bypasses, QEMU S13 zero PCR11, and sta
     });
   }
 });
+
+test('ARTEX-EDGE-001..003 and ARTEX-BEHAV-001 detect exposed recon/OAuth surfaces and machine-speed logs in Desktop analyzers', () => fixture(async f => {
+  await fs.mkdir(path.join(f.root, 'src'), { recursive: true });
+  await fs.mkdir(path.join(f.root, 'public', 'assets'), { recursive: true });
+  await fs.writeFile(path.join(f.root, 'public', 'assets', 'bundle.js.map'), '{"version":3}');
+  await fs.writeFile(path.join(f.root, 'src', 'edge.js'), [
+    'app.use("/api-docs", swaggerUi.serve);',
+    'passport.use({ state: false });',
+    'app.post("/backup/run", { skipAuth: true }, runBackup);'
+  ].join('\n'));
+  const walk = async function* (dir) {
+    for (const ent of await fs.readdir(dir, { withFileTypes: true })) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) yield* walk(full);
+      else if (ent.isFile()) yield full;
+    }
+  };
+  const codeAudit = await auditCodePatterns(f.root, f.root, {
+    relativePath: (r, p) => path.relative(r, p).split(path.sep).join('/'),
+    walk,
+    readText: p => fs.readFile(p, 'utf8')
+  }, f.signal);
+  const rules = new Set(codeAudit.matches.map(m => m.ruleId));
+  assert.ok(rules.has('ARTEX-EDGE-001'));
+  assert.ok(rules.has('ARTEX-EDGE-002'));
+  assert.ok(rules.has('ARTEX-EDGE-003'));
+  assert.ok((codeAudit.cantTellReasons || []).some(r => r.code === 'ARTEX-EDGE-001'));
+
+  const artexLog = path.join(f.root, 'artex.jsonl');
+  await fs.writeFile(artexLog, [
+    { ts: '2026-11-26T18:00:00.000Z', ip: '198.51.100.1', method: 'GET', path: '/openapi.json', status: 200, ua: 'Mozilla/5.0' },
+    { ts: '2026-11-26T18:00:00.300Z', ip: '198.51.100.2', method: 'POST', path: '/oauth/token?a=1', status: 400, ua: 'Mozilla/5.0' },
+    { ts: '2026-11-26T18:00:00.600Z', ip: '198.51.100.3', method: 'POST', path: '/oauth/token?a=2', status: 401, ua: 'Mozilla/5.0' },
+    { ts: '2026-11-26T18:00:00.900Z', ip: '198.51.100.4', method: 'POST', path: '/api/v1/auth/login', status: 422, ua: 'Mozilla/5.0' },
+    { ts: '2026-11-26T18:00:01.200Z', ip: '198.51.100.5', method: 'GET', path: '/api/v1/users/1', status: 403, ua: 'Mozilla/5.0' },
+    { ts: '2026-11-26T18:00:01.500Z', ip: '198.51.100.6', method: 'GET', path: '/admin/export', status: 403, ua: 'Mozilla/5.0' },
+    { ts: '2026-11-26T18:00:01.800Z', ip: '198.51.100.7', method: 'GET', path: '/admin/users', status: 200, ua: 'Mozilla/5.0' }
+  ].map(x => JSON.stringify(x)).join('\n'));
+  const logRes = await analyzeLogs(artexLog, 'artex.jsonl', {}, f.signal);
+  assert.equal(logRes.agenticBehavior.detected, true);
+  assert.ok(logRes.alerts.some(a => a.ruleId === 'ARTEX-BEHAV-001'));
+}));
