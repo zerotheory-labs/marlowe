@@ -1,4 +1,5 @@
 const fs = require('node:fs/promises');
+const { constants } = require('node:fs');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
@@ -11,7 +12,11 @@ const execFileAsync = promisify(execFile);
 
 const PROTECTED_SEGMENTS_RE = /^(\.git|\.ssh|\.aws|\.gnupg|\.codex|\.shirudo|shirudo-keys|\.npmrc|\.netrc|\.pypirc|\.env(?:\..*)?|.*\.(?:pem|key))$/i;
 const ENV_TEMPLATE_RE = /^\.env\.(?:example|sample|template|dist)$/i;
-const SKIP_DIRS = new Set(['node_modules', '.git', '.venv', 'venv', 'dist', 'build', 'coverage', '.next']);
+const SKIP_DIRS = new Set([
+  'node_modules', '.venv', 'venv', '__pycache__', '.uv-cache', '.cache',
+  '.pytest_cache', '.mypy_cache', '.ruff_cache', '.tox', '.nox', '.next',
+  '.nuxt', '.turbo', '.parcel-cache', 'dist', 'release', 'test-results', 'playwright-report'
+]);
 
 const BEEFILE_NAME_RE = /(?:^|\/)(?:Beefile|[^/]+\.beefile)$/i;
 const BPF_SOURCE_NAME_RE = /\.(?:bpf|upatch)\.c$/i;
@@ -69,46 +74,59 @@ async function resolveWithinWorkspace(root, relOrAbs = '.') {
   };
 }
 
-async function readRegularText(fullPath, maxBytes = 1024 * 1024) {
-  const lst = await fs.lstat(fullPath);
-  if (lst.isSymbolicLink() || !lst.isFile()) {
-    throw new Error('Target must be a regular workspace file.');
+async function readRegularText(fullPath, maxBytes = 250000) {
+  let handle;
+  try {
+    handle = await fs.open(fullPath, constants.O_RDONLY | (constants.O_NOFOLLOW || 0));
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.nlink > 1) {
+      throw new Error('Expected a regular file without symlinks or hard links.');
+    }
+    if (stat.size > maxBytes) {
+      throw new Error(`File exceeds ${maxBytes}-byte text inspection limit.`);
+    }
+    const buf = Buffer.alloc(stat.size);
+    let offset = 0;
+    while (offset < stat.size) {
+      const { bytesRead } = await handle.read(buf, offset, stat.size - offset, offset);
+      if (!bytesRead) break;
+      offset += bytesRead;
+    }
+    const slice = buf.subarray(0, offset);
+    if (slice.subarray(0, Math.min(slice.length, 4096)).includes(0)) {
+      throw new Error('Binary file skipped for text inspection.');
+    }
+    return slice.toString('utf8');
+  } finally {
+    await handle?.close().catch(() => {});
   }
-  if (lst.size > maxBytes) {
-    throw new Error(`File exceeds maximum size (${maxBytes} bytes).`);
-  }
-  const buf = await fs.readFile(fullPath);
-  if (buf.subarray(0, 4096).includes(0)) {
-    throw new Error('Target appears to be a binary file.');
-  }
-  return buf.toString('utf8');
 }
 
-async function* walkShirudoDir(startDir, signal, state = { count: 0, deadline: Date.now() + 10000 }) {
-  const stack = [startDir];
-  while (stack.length > 0) {
+async function* walkShirudoDir(startDir, signal, state = { truncated: false, deadline: Date.now() + 10000 }) {
+  const queue = [path.resolve(startDir)];
+  let visited = 0;
+  while (queue.length) {
     signal?.throwIfAborted?.();
-    if (Date.now() > state.deadline || state.count >= 5000) break;
-    const dir = stack.pop();
-    let entries;
-    try {
-      entries = await fs.readdir(dir, { withFileTypes: true });
-    } catch {
-      continue;
+    if (Date.now() > state.deadline || visited > 15000) {
+      state.truncated = true;
+      break;
     }
-    for (const ent of entries) {
-      if (state.count >= 5000) break;
-      if (ent.isSymbolicLink()) continue;
-      if (isProtectedSeg(ent.name)) continue;
-      const full = path.join(dir, ent.name);
-      if (ent.isDirectory()) {
-        if (SKIP_DIRS.has(ent.name)) continue;
-        stack.push(full);
-      } else if (ent.isFile()) {
-        state.count++;
+    const dir = queue.pop();
+    let entries;
+    try { entries = await fs.readdir(dir, { withFileTypes: true }); } catch { continue; }
+    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    const subdirs = [];
+    for (const entry of entries) {
+      if (++visited > 15000 || Date.now() > state.deadline) { state.truncated = true; break; }
+      if (entry.name === '.DS_Store' || entry.isSymbolicLink() || isProtectedSeg(entry.name)) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(entry.name)) subdirs.push(full);
+      } else if (entry.isFile()) {
         yield full;
       }
     }
+    queue.push(...subdirs.reverse());
   }
 }
 
@@ -1539,7 +1557,7 @@ async function inspectShirudoTarget(root, relTarget = '.', signal = new AbortCon
 
   const candidates = [];
   if (stat.isDirectory()) {
-    const walkState = { count: 0, deadline: Date.now() + 10000 };
+    const walkState = { truncated: false, deadline: Date.now() + 10000 };
     for await (const fullPath of walkShirudoDir(resolved.fullPath, signal, walkState)) {
       const rel = path.relative(resolved.rootReal, fullPath).split(path.sep).join('/');
       if (isShirudoArtifactPath(rel)) {
