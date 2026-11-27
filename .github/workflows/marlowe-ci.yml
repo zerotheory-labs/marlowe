@@ -22,7 +22,7 @@ jobs:
 
       - name: Run Marlowe CI / Guard
         id: marlowe
-        uses: zerotheory-labs/marlowe-ci@ddf709be1d80c8206f837a77cd464f6bb16322d0
+        uses: zerotheory-labs/marlowe-ci@f789227964550dc3191765ac5e59309654023f65 # v0.7.2
         with:
           mode: diff
           fail-on: high
