@@ -14,6 +14,11 @@ function workspaceId(workspace) {
   return createHash('sha256').update(String(workspace || '')).digest('hex').slice(0, 16);
 }
 
+// Bind a scanner result to the file it inspected, including replacement and same-size edits.
+function scanRevision(stat) {
+  return [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs].join(':');
+}
+
 function cleanField(value, max, fallback = '') {
   if (typeof value !== 'string') return fallback;
   return value.replace(/\0/g, '').trim().slice(0, max);
@@ -72,8 +77,39 @@ function sortFindings(list) {
   });
 }
 
-function createFindingsStore(baseDir) {
+function createFindingsStore(baseDir, onScansChanged) {
   const filePath = workspace => path.join(baseDir, `${workspaceId(workspace)}.json`);
+  const scansPath = workspace => path.join(baseDir, `${workspaceId(workspace)}.scans.json`);
+  let pendingScans = Promise.resolve();
+
+  async function listScans(workspace) {
+    try {
+      return new Map(JSON.parse(await fs.readFile(scansPath(workspace), 'utf8')));
+    } catch (error) {
+      if (error.code === 'ENOENT') return new Map();
+      throw error;
+    }
+  }
+
+  function recordScans(workspace, scanner, files) {
+    // A separate, atomic index lets findings and scanner completions commit independently.
+    const write = pendingScans.then(async () => {
+      const results = await listScans(workspace);
+      for (const [file, revision] of files) {
+        const prev = results.get(file);
+        const scanners = new Set(prev?.revision === revision ? prev.scanners : []);
+        scanners.add(scanner);
+        results.set(file, { revision, scanners: [...scanners].sort() });
+      }
+      await fs.mkdir(baseDir, { recursive: true, mode: 0o700 });
+      const target = scansPath(workspace), temp = `${target}.${randomUUID()}.tmp`;
+      await fs.writeFile(temp, JSON.stringify([...results]), { mode: 0o600 });
+      await fs.rename(temp, target);
+      onScansChanged?.(workspace);
+    });
+    pendingScans = write.catch(() => {});
+    return write;
+  }
 
   async function readWorkspace(workspace) {
     try {
@@ -94,6 +130,8 @@ function createFindingsStore(baseDir) {
   }
 
   return {
+    listScans,
+    recordScans,
     list: workspace => readWorkspace(workspace),
     async record(workspace, input, context = {}) {
       const normalized = normalizeFinding(input, context);
@@ -265,6 +303,7 @@ function toSarifReport({ workspace, findings = [], appVersion = '0.6.0', generat
 }
 
 module.exports = {
+  scanRevision,
   SEVERITIES,
   STATUSES,
   CATEGORIES,

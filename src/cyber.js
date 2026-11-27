@@ -297,11 +297,12 @@ export function setupCyber(api, { notify, caught, onDraftFix, onDraftShield, onA
   }
 
   let dnaRefreshing = false;
+  let dnaRefreshPending = false;
   api.onFindingsChanged(next => {
     findings = Array.isArray(next) ? next : [];
     updateBadge();
     if (!$('findings-dialog').hidden) renderFindings();
-    if (!$('dna-dialog')?.hidden && !dnaRefreshing) refreshDna();
+    if (!$('dna-dialog')?.hidden) refreshDna();
   });
 
   function formatBytes(bytes) {
@@ -315,9 +316,8 @@ export function setupCyber(api, { notify, caught, onDraftFix, onDraftShield, onA
     if (item.maxSeverity === 'medium' || item.maxSeverity === 'low' || item.maxSeverity === 'info') {
       return { cls: 'warn', hex: '#f2c14e', label: item.maxSeverity.toUpperCase() };
     }
-    if (item.kind === 'binary' || item.kind === 'capture') return { cls: 'binary', hex: '#7eafff', label: item.kind.toUpperCase() };
-    if (item.kind === 'upatch') return { cls: 'clean', hex: '#3ddc97', label: 'UPATCH' };
-    return { cls: 'clean', hex: '#3ddc97', label: 'CLEAN' };
+    if (item.scannedBy?.length) return { cls: 'scanned', hex: '#7eafff', label: 'Scanned' };
+    return { cls: 'not-scanned', hex: '#92908b', label: 'Not scanned' };
   }
 
   function renderDnaInspector(item) {
@@ -333,7 +333,7 @@ export function setupCyber(api, { notify, caught, onDraftFix, onDraftShield, onA
 
     const head = el('div', 'dna-insp-head');
     const pathEl = el('code', 'dna-insp-path', item.path);
-    const badge = el('span', `zt-tag ${st.cls === 'crit' ? 'rose' : st.cls === 'warn' ? 'sand' : st.cls === 'binary' ? 'sky' : 'green'}`, st.label);
+    const badge = el('span', `zt-tag ${st.cls === 'crit' ? 'rose' : st.cls === 'warn' ? 'sand' : st.cls === 'scanned' ? 'sky' : 'muted'}`, st.label);
     head.append(pathEl, badge);
 
     const meta = el('div', 'dna-insp-meta', `${item.kind.toUpperCase()} · ${formatBytes(item.size)} · Shannon entropy ${item.entropy.toFixed(2)} / 8.00 b/B`);
@@ -347,8 +347,9 @@ export function setupCyber(api, { notify, caught, onDraftFix, onDraftShield, onA
     barTrack.append(barFill, thresholdMark);
 
     const enginesRow = el('div', 'dna-engines-row');
-    enginesRow.append(el('span', 'dna-engines-label', 'CLI COVERAGE:'));
-    for (const eng of item.engines || []) {
+    enginesRow.append(el('span', 'dna-engines-label', 'Scanner results'));
+    if (!item.scannedBy?.length) enginesRow.append(el('span', '', 'Not scanned'));
+    for (const eng of item.scannedBy || []) {
       enginesRow.append(el('span', 'dna-engine-chip', eng));
     }
 
@@ -559,6 +560,7 @@ export function setupCyber(api, { notify, caught, onDraftFix, onDraftShield, onA
   }
 
   async function refreshDna() {
+    if (dnaRefreshing) { dnaRefreshPending = true; return; }
     const btn = $('dna-refresh');
     dnaRefreshing = true;
     if (btn) { btn.disabled = true; btn.textContent = 'Mapping…'; }
@@ -566,13 +568,17 @@ export function setupCyber(api, { notify, caught, onDraftFix, onDraftShield, onA
       dnaData = await api.scanDna();
       renderDna();
       if (dnaData?.autoMitigated > 0) {
-        notify(`Cleared ${dnaData.autoMitigated} remediated finding(s) → node marked Clean.`);
+        notify(`Marked ${dnaData.autoMitigated} finding(s) as mitigated.`);
       }
     } catch (err) {
       notify('Could not map workspace DNA: ' + err.message);
     } finally {
       dnaRefreshing = false;
       if (btn) { btn.disabled = false; btn.textContent = 'Rescan'; }
+      if (dnaRefreshPending) {
+        dnaRefreshPending = false;
+        if (!$('dna-dialog')?.hidden) await refreshDna();
+      }
     }
   }
 

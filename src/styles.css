@@ -409,8 +409,8 @@ textarea::placeholder { color: var(--mute); }
 .dna-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; padding-top: 8px; margin-top: 6px; border-top: 1px solid var(--line-subtle); font: 500 9.5px var(--mono); color: var(--mute); letter-spacing: .04em; }
 .dna-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .dna-dot-key { display: inline-block; width: 7px; height: 7px; border-radius: 50%; }
-.dna-dot-key.clean { background: #3ddc97; }
-.dna-dot-key.binary { background: #7eafff; }
+.dna-dot-key.not-scanned { background: #92908b; }
+.dna-dot-key.scanned { background: #7eafff; }
 .dna-dot-key.warn { background: #f2c14e; }
 .dna-dot-key.crit { background: #f26d5b; }
 .dna-inspector { margin-top: 10px; padding: 12px 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); display: grid; gap: 8px; }

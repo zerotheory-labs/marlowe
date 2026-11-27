@@ -424,6 +424,80 @@ test('record_findings batches multiple findings in one step, and step-budget exh
   assert.match(loopRes.content, /Stopped retrying missing file/);
 }));
 
+test('workspace maps require scanner evidence for this file revision, even with installed tools', () => fixture(async f => {
+  const store = createFindingsStore(f.findingsDir);
+  const manifest = path.join(f.root, 'package.json');
+  await fs.writeFile(manifest, '{"name":"example"}\n');
+  await fs.mkdir(path.join(f.root, 'src'));
+  await fs.writeFile(path.join(f.root, 'src', 'a.js'), 'const a = 1;\n');
+  const tools = ['trivy', 'osv-scanner', 'semgrep'].map(id => ({ id, available: true }));
+  async function maps() {
+    // Reload from disk just as a new Desktop session would.
+    const scans = await createFindingsStore(f.findingsDir).listScans(f.root);
+    return buildWorkspaceGraphs(f.root, { tools, scans });
+  }
+  const initial = await maps();
+  assert.ok(initial.convergence.assets.every(a => a.status === 'not-scanned'));
+  assert.deepEqual(initial.convergence.impacts.map(i => i.label), ['Not scanned']);
+  assert.ok(initial.reachability.lanes.every(l => l.state === 'not-scanned'));
+
+  const plan = await prepareTool(f.root, 'scan_secrets', { path: 'src' });
+  const result = await executeTool(f.root, plan, { ...f, findingsStore: store });
+  assert.equal(result.findingsCount, 0);
+  const scanned = await maps();
+  assert.deepEqual(scanned.convergence.assets.find(a => a.path === 'src/a.js').scannedBy, ['scan_secrets']);
+  assert.equal(scanned.reachability.lanes.find(l => l.path === 'src/a.js').state, 'scanned');
+  assert.equal(scanned.convergence.assets.find(a => a.path === 'package.json').status, 'not-scanned');
+  await fs.writeFile(path.join(f.root, 'src', 'a.js'), 'const a = 2;\n');
+  assert.equal((await maps()).convergence.assets.find(a => a.path === 'src/a.js').status, 'not-scanned');
+}));
+
+test('a manifest needs completed advisory results before the dependency audit counts as a scan', () => fixture(async f => {
+  const store = createFindingsStore(f.findingsDir);
+  await fs.writeFile(path.join(f.root, 'package.json'), JSON.stringify({ dependencies: { sample: '1.0.0' } }));
+  const plan = await prepareTool(f.root, 'audit_dependencies', { path: 'package.json' });
+  const audit = results => executeTool(f.root, plan, { ...f, findingsStore: store,
+    fetchImpl: async () => ({ ok: true, json: async () => ({ results }) }) });
+  await audit([]);
+  assert.equal((await store.listScans(f.root)).size, 0);
+  await audit([{}]);
+  assert.deepEqual((await store.listScans(f.root)).get('package.json').scanners, ['audit_dependencies']);
+}));
+
+test('external scan coverage uses completed reports and only the files named in them', () => fixture(async f => {
+  const store = createFindingsStore(f.findingsDir);
+  const trustedBin = path.join(f.dir, 'bin');
+  await fs.mkdir(trustedBin);
+  await fs.writeFile(path.join(trustedBin, process.platform === 'win32' ? 'semgrep.exe' : 'semgrep'), '', { mode: 0o755 });
+  await fs.mkdir(path.join(f.root, 'src'));
+  for (const name of ['checked.js', 'omitted.js']) await fs.writeFile(path.join(f.root, 'src', name), '// file\n');
+  const plan = await prepareTool(f.root, 'run_security_scanner', { scanner: 'semgrep', target: 'src' });
+  async function report(stdout, code = 0) {
+    const spawnImpl = () => {
+      const child = new EventEmitter();
+      child.stdout = new EventEmitter();
+      child.stderr = new EventEmitter();
+      queueMicrotask(() => {
+        child.stderr.emit('data', 'diagnostic on stderr\n');
+        child.stdout.emit('data', stdout);
+        child.emit('close', code, null);
+      });
+      return child;
+    };
+    return executeTool(f.root, plan, { ...f, findingsStore: store, commandPath: trustedBin, spawnImpl });
+  }
+  const valid = JSON.stringify({ results: [], paths: { scanned: ['src/checked.js'] } });
+  await report(valid, 2);
+  await report('incomplete output');
+  await report(JSON.stringify({ results: [], paths: { scanned: ['src/checked.js'] }, errors: [{ message: 'partial scan' }] }));
+  assert.equal((await store.listScans(f.root)).size, 0);
+  await report(valid);
+  const scans = await store.listScans(f.root);
+  const dna = await scanWorkspaceDna(f.root, { scans, tools: [{ id: 'semgrep', available: true }] });
+  assert.deepEqual(dna.files.find(file => file.path === 'src/checked.js').scannedBy, ['semgrep']);
+  assert.deepEqual(dna.files.find(file => file.path === 'src/omitted.js').scannedBy, []);
+}));
+
 test('scanWorkspaceDna maps Shannon byte entropy, skips symlinks & protected dotfiles, and joins CLI + finding posture', () => fixture(async f => {
   await fs.mkdir(path.join(f.root, 'src'), { recursive: true });
   await fs.mkdir(path.join(f.root, 'artifacts'), { recursive: true });

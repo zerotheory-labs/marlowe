@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('benjamin', {
   scanToolchain: invoke('cyber:toolchain'), scanDna: invoke('cyber:dna'), scanGraphs: invoke('cyber:graphs'), redactText: invoke('cyber:redact'),
   listFindings: invoke('findings:list'), updateFinding: invoke('findings:update'),
   deleteFinding: invoke('findings:delete'), clearFindings: invoke('findings:clear'),
-  exportFindings: invoke('findings:export'), onFindingsChanged: listen('findings:changed'),
+  exportFindings: invoke('findings:export'), onFindingsChanged: listen('findings:changed'), onScansChanged: listen('scans:changed'),
   createTerminal: invoke('terminal:create'), writeTerminal: invoke('terminal:write'),
   resizeTerminal: invoke('terminal:resize'), closeTerminal: invoke('terminal:close'),
   terminalContextMenu: invoke('terminal:context-menu'), terminalState: invoke('terminal:state'),
