@@ -206,7 +206,7 @@ function parseLocationUri(location) {
   return { uri: location.replace(/^\.\//, ''), line: null };
 }
 
-function toMarkdownReport({ workspace, scope = {}, findings = [], appVersion = '0.6.0', generatedAt = new Date().toISOString() }) {
+function toMarkdownReport({ workspace, scope = {}, findings = [], appVersion = '0.6.1', generatedAt = new Date().toISOString() }) {
   const active = findings.filter(f => f.status === 'open' || f.status === 'verified');
   const counts = Object.fromEntries(SEVERITIES.map(s => [s, active.filter(f => f.severity === s).length]));
   const lines = [
@@ -246,7 +246,7 @@ function toMarkdownReport({ workspace, scope = {}, findings = [], appVersion = '
   return lines.join('\n');
 }
 
-function toSarifReport({ workspace, findings = [], appVersion = '0.6.0', generatedAt = new Date().toISOString() }) {
+function toSarifReport({ workspace, findings = [], appVersion = '0.6.1', generatedAt = new Date().toISOString() }) {
   const active = findings.filter(f => f.status !== 'false-positive' && f.status !== 'mitigated');
   const rulesMap = new Map();
   const results = active.map(f => {
